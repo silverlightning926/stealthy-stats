@@ -1,0 +1,19 @@
+[project]
+name = "data"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.17.1",
+    "httpx>=0.28.1",
+    "prefect>=3.4.25",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+    "python-dotenv>=1.2.1",
+    "sqlmodel>=0.0.27",
+]
+dynamic = ["version"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+    "ruff>=0.14.2",
+]
