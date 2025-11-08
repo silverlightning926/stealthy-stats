@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import Field, SQLModel
 
 
 class Team(SQLModel, table=True):
@@ -12,7 +12,6 @@ class Team(SQLModel, table=True):
         index=True,
         description="Official team number issued by FIRST.",
         ge=1,
-        le=99999,
     )
     nickname: str = Field(description="Team nickname provided by FIRST.")
     name: str = Field(description="Official long name registered with FIRST.")
@@ -41,5 +40,7 @@ class Team(SQLModel, table=True):
         default=None, description="Official website associated with the team."
     )
     rookie_year: int | None = Field(
-        default=None, description="First year the team officially competed."
+        default=None,
+        description="First year the team officially competed.",
+        ge=1992,
     )

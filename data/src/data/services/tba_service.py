@@ -1,11 +1,9 @@
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import httpx
+from models.tba import Event, Team
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from models.tba import Team
-from typing import TypeVar, Generic
 
 T = TypeVar("T")
 
@@ -60,5 +58,18 @@ class TBAService:
 
         return TBAResponse(
             data=[Team.model_validate(team_data) for team_data in response.data],
+            etag=response.etag,
+        )
+
+    def get_events(
+        self, year: int, etag: str | None = None
+    ) -> TBAResponse[list[Event]] | None:
+        response = self._get(endpoint=f"/events/{year}", etag=etag)
+
+        if response is None:
+            return None
+
+        return TBAResponse(
+            data=[Event.model_validate(event_data) for event_data in response.data],
             etag=response.etag,
         )
