@@ -48,6 +48,17 @@ class TBAService:
 
         return TBAResponse(data=req.json(), etag=req.headers.get("ETag"))
 
+    def get_team(self, key: str, etag: str | None = None) -> TBAResponse[Team] | None:
+        response = self._get(endpoint=f"/team/{key}", etag=etag)
+
+        if response is None:
+            return None
+
+        return TBAResponse(
+            data=Team.model_validate(response.data),
+            etag=response.etag,
+        )
+
     def get_teams(
         self, page: int, etag: str | None = None
     ) -> TBAResponse[list[Team]] | None:
@@ -58,6 +69,17 @@ class TBAService:
 
         return TBAResponse(
             data=[Team.model_validate(team_data) for team_data in response.data],
+            etag=response.etag,
+        )
+
+    def get_event(self, key: str, etag: str | None = None) -> TBAResponse[Event] | None:
+        response = self._get(endpoint=f"/event/{key}", etag=etag)
+
+        if response is None:
+            return None
+
+        return TBAResponse(
+            data=Event.model_validate(response.data),
             etag=response.etag,
         )
 
