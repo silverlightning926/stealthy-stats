@@ -8,12 +8,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 T = TypeVar("T")
 
 
-class TBAResponse(Generic[T]):
-    def __init__(self, data: T, etag: str | None):
-        self.data = data
-        self.etag = etag
-
-
 class _TBAConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -24,6 +18,12 @@ class _TBAConfig(BaseSettings):
     api_key: str = Field(..., min_length=1, validation_alias="TBA_API_KEY")
     base_url: str = "https://www.thebluealliance.com/api/v3"
     timeout: int = 10  # In Seconds
+
+
+class TBAResponse(Generic[T]):
+    def __init__(self, data: T, etag: str | None):
+        self.data = data
+        self.etag = etag
 
 
 class TBAService:
