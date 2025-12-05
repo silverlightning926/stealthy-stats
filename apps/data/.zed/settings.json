@@ -1,0 +1,29 @@
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff", "pyright"],
+      "format_on_save": "on",
+      "formatter": "language_server"
+    }
+  },
+  "lsp": {
+    "ruff": {
+      "binary": {
+        "path": "uv",
+        "arguments": ["run", "--project", "apps/data", "ruff", "server"]
+      }
+    },
+    "pyright": {
+      "binary": {
+        "path": "uv",
+        "arguments": [
+          "run",
+          "--project",
+          "apps/data",
+          "pyright-langserver",
+          "--stdio"
+        ]
+      }
+    }
+  }
+}
