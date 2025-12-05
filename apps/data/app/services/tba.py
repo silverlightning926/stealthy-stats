@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 import polars as pl
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +13,7 @@ class _TBAConfig(BaseSettings):
         extra="ignore",
     )
 
-    api_key: str = Field(..., min_length=1, validation_alias="TBA_API_KEY")
+    api_key: SecretStr = Field(..., min_length=1, validation_alias="TBA_API_KEY")
     base_url: str = "https://www.thebluealliance.com/api/v3"
     timeout: int = 10  # In Seconds
 
@@ -31,7 +31,7 @@ class TBAService:
     def _get(
         self, endpoint: str, etag: str | None = None
     ) -> tuple[list[dict[str, Any]], str | None] | None:
-        headers = {"X-TBA-Auth-Key": self.config.api_key}
+        headers = {"X-TBA-Auth-Key": self.config.api_key.get_secret_value()}
         if etag is not None:
             headers["If-None-Match"] = etag
 

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 
 import psycopg
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +12,7 @@ class _DBConfig(BaseSettings):
         extra="ignore",
     )
 
-    db_url: str = Field(..., min_length=1, validation_alias="DATABASE_URL")
+    db_url: SecretStr = Field(..., min_length=1, validation_alias="DATABASE_URL")
 
 
 class DBService:
@@ -21,7 +21,8 @@ class DBService:
 
     @contextmanager
     def get_connection(self):
-        conn = psycopg.connect(self.config.db_url)
+        conn = psycopg.connect(self.config.db_url.get_secret_value())
+
         try:
             yield conn
             conn.commit()
