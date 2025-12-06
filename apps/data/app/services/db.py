@@ -7,7 +7,8 @@ from sqlalchemy import MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.models import tba
+from app.models import ETag  # noqa: F401
+from app.models.tba import District, Event, Team  # noqa: F401
 
 
 class _DBConfig(BaseSettings):
@@ -28,14 +29,10 @@ class DBService:
             echo=False,
         )
 
-        # Assiging To Nothing To Satisfy Linting
-        # Import Needed For SQLModel To Create Tables From Models
-        _ = tba
-
         SQLModel.metadata.create_all(self.engine)
 
     @contextmanager
-    def get_connection(self):
+    def get_session(self):
         session = Session(self.engine)
         try:
             yield session
@@ -47,7 +44,7 @@ class DBService:
             session.close()
 
     def upsert(self, df: pl.DataFrame, table_name: str, conflict_key: str):
-        with self.get_connection() as session:
+        with self.get_session() as session:
             columns = df.columns
             records = [dict(zip(columns, row)) for row in df.iter_rows()]
 
@@ -66,3 +63,13 @@ class DBService:
             )
 
             session.exec(upsert_stmt)
+
+    def get_etag(self, endpoint: str) -> str | None:
+        with self.get_session() as session:
+            existing_etag = session.get(ETag, endpoint)
+            return existing_etag.etag if existing_etag else None
+
+    def upsert_etag(self, endpoint: str, etag: str) -> None:
+        with self.get_session() as session:
+            new_etag = ETag(endpoint=endpoint, etag=etag)
+            session.merge(new_etag)
