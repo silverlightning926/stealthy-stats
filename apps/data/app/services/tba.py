@@ -1,9 +1,19 @@
+from enum import StrEnum
 from typing import Any
 
 import httpx
 import polars as pl
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class _TBAEndpoint(StrEnum):
+    TEAMS = "/teams"
+    EVENTS = "/events"
+    DISTRICTS = "/districts"
+
+    def add_dynamic(self, segment: str) -> str:
+        return f"{self.value}/{segment}"
 
 
 class _TBAConfig(BaseSettings):
@@ -49,7 +59,10 @@ class TBAService:
         return (req.json(), req.headers.get("ETag"))
 
     def get_teams(self, page: int, etag: str | None = None) -> TBAResponse | None:
-        response = self._get(endpoint=f"/teams/{page}", etag=etag)
+        response = self._get(
+            endpoint=_TBAEndpoint.TEAMS.add_dynamic(str(page)),
+            etag=etag,
+        )
 
         if response is None:
             return None
@@ -76,7 +89,10 @@ class TBAService:
         )
 
     def get_events(self, year: int, etag: str | None = None) -> TBAResponse | None:
-        response = self._get(endpoint=f"/events/{year}", etag=etag)
+        response = self._get(
+            endpoint=_TBAEndpoint.EVENTS.add_dynamic(str(year)),
+            etag=etag,
+        )
 
         if response is None:
             return None
@@ -134,7 +150,10 @@ class TBAService:
         )
 
     def get_districts(self, year: int, etag: str | None = None) -> TBAResponse | None:
-        response = self._get(endpoint=f"/districts/{year}", etag=etag)
+        response = self._get(
+            endpoint=_TBAEndpoint.DISTRICTS.add_dynamic(str(year)),
+            etag=etag,
+        )
 
         if response is None:
             return None
