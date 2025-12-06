@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class District(SQLModel, table=True):
-    __tablename__ = "districts"
+    __tablename__ = "districts"  # pyright: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
