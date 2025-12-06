@@ -2,7 +2,9 @@ from time import sleep
 
 import polars as pl
 from prefect import task
+from pydantic import TypeAdapter
 
+from app.models.tba import Team
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 
@@ -46,8 +48,12 @@ def sync_teams():
         sleep(1.5)
 
     if teams:
+        teams_df = pl.concat(teams)
+
+        TypeAdapter(list[Team]).validate_python(teams_df.to_dicts())
+
         db.upsert(
-            pl.concat(teams),
+            teams_df,
             table_name="teams",
             conflict_key="key",
         )
