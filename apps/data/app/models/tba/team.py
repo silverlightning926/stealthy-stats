@@ -2,7 +2,7 @@ from sqlmodel import Field, SQLModel
 
 
 class Team(SQLModel, table=True):
-    __tablename__ = "teams"
+    __tablename__ = "teams"  # pyright: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,

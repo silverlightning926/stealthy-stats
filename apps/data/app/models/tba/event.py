@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class Event(SQLModel, table=True):
-    __tablename__ = "events"
+    __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
