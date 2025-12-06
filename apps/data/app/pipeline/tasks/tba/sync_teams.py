@@ -4,8 +4,10 @@ import polars as pl
 from prefect import task
 
 from app.services import DBService, TBAService
+from app.services.tba import _TBAEndpoint
 
 
+# TODO: Add Logging To Sync Team Task
 @task(
     name="Sync Teams",
     description="Sync FRC Teams From The Blue ALliance",
@@ -18,16 +20,34 @@ def sync_teams():
 
     teams: list[pl.DataFrame] = []
 
-    # TODO: Change TBA Team Sync To Handle Page Count Dynamically
-    for page_num in range(0, 30):
-        # TODO: Add Etag Fetching & Caching
-        page = tba.get_teams(page=page_num)
+    # Upper bound for safety - should break loop if it hits an empty page before upper bound
+    for page_num in range(0, 50):
+        etag_key = _TBAEndpoint.TEAMS.add_dynamic(str(page_num))
 
-        if page:
-            if not page.data.is_empty():
-                teams.append(page.data)
+        page = tba.get_teams(
+            page=page_num,
+            etag=db.get_etag(endpoint=etag_key),
+        )
+
+        if page is None:
+            continue  # ETag Hit - Skip to the next loop iteration
+
+        if page.data.is_empty():
+            break  # Reached Empty Page - Break out of the loop
+
+        teams.append(page.data)
+
+        if page.etag:
+            db.upsert_etag(
+                endpoint=etag_key,
+                etag=page.etag,
+            )
 
         sleep(1.5)
 
     if teams:
-        db.upsert(pl.concat(teams), table_name="teams", conflict_key="key")
+        db.upsert(
+            pl.concat(teams),
+            table_name="teams",
+            conflict_key="key",
+        )
