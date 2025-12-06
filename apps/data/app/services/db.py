@@ -1,8 +1,13 @@
 from contextlib import contextmanager
 
-import psycopg
+import polars as pl
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import MetaData, Table
+from sqlalchemy.dialects.postgresql import insert
+from sqlmodel import Session, SQLModel, create_engine
+
+from app.models import tba
 
 
 class _DBConfig(BaseSettings):
@@ -18,16 +23,46 @@ class _DBConfig(BaseSettings):
 class DBService:
     def __init__(self):
         self.config = _DBConfig()  # pyright: ignore[reportCallIssue]
+        self.engine = create_engine(
+            self.config.db_url.get_secret_value(),
+            echo=False,
+        )
+
+        # Assiging To Nothing To Satisfy Linting
+        # Import Needed For SQLModel To Create Tables From Models
+        _ = tba
+
+        SQLModel.metadata.create_all(self.engine)
 
     @contextmanager
     def get_connection(self):
-        conn = psycopg.connect(self.config.db_url.get_secret_value())
-
+        session = Session(self.engine)
         try:
-            yield conn
-            conn.commit()
+            yield session
+            session.commit()
         except Exception:
-            conn.rollback()
+            session.rollback()
             raise
         finally:
-            conn.close()
+            session.close()
+
+    def upsert(self, df: pl.DataFrame, table_name: str, conflict_key: str):
+        with self.get_connection() as session:
+            columns = df.columns
+            records = [dict(zip(columns, row)) for row in df.iter_rows()]
+
+            if not records:
+                return
+
+            metadata = MetaData()
+            table = Table(table_name, metadata, autoload_with=self.engine)
+
+            update_cols = {c: table.c[c] for c in columns if c != conflict_key}
+
+            stmt = insert(table).values(records)
+            upsert_stmt = stmt.on_conflict_do_update(
+                index_elements=[conflict_key],
+                set_=update_cols,
+            )
+
+            session.exec(upsert_stmt)

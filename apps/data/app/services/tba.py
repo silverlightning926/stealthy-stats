@@ -15,7 +15,7 @@ class _TBAConfig(BaseSettings):
 
     api_key: SecretStr = Field(..., min_length=1, validation_alias="TBA_API_KEY")
     base_url: str = "https://www.thebluealliance.com/api/v3"
-    timeout: int = 10  # In Seconds
+    timeout_seconds: int = 30  # In Seconds
 
 
 class TBAResponse:
@@ -38,7 +38,7 @@ class TBAService:
         req = httpx.get(
             url=self.config.base_url + endpoint,
             headers=headers,
-            timeout=self.config.timeout,
+            timeout=self.config.timeout_seconds,
         )
 
         if req.status_code == 304:
