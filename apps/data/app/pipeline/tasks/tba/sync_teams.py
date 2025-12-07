@@ -31,11 +31,11 @@ def sync_teams():
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if page is None:
-            continue  # ETag Hit - Skip to the next loop iteration
+        if page is None:  # ETag Hit:
+            continue  # Skip to the next loop iteration
 
-        if page.data.is_empty():
-            break  # Reached Empty Page - Break out of the loop
+        if page.data.is_empty():  # Reached Empty Page:
+            break  # Break out of the loop
 
         teams.append(page.data)
 
