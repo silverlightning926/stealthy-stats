@@ -25,7 +25,7 @@ def sync_teams():
 
     # Upper bound for safety - should break loop if it hits an empty page before upper bound
     for page_num in range(0, 50):
-        etag_key = _TBAEndpoint.TEAMS.add_dynamic(str(page_num))
+        etag_key = _TBAEndpoint.TEAMS.build(page=str(page_num))
 
         page = tba.get_teams(
             page=page_num,

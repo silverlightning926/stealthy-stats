@@ -10,12 +10,12 @@ from app.models.tba import District, Event, Team
 
 
 class _TBAEndpoint(StrEnum):
-    TEAMS = "/teams"
-    EVENTS = "/events"
-    DISTRICTS = "/districts"
+    TEAMS = "/teams/{page}"
+    EVENTS = "/events/{year}"
+    DISTRICTS = "/districts/{year}"
 
-    def add_dynamic(self, segment: str) -> str:
-        return f"{self.value}/{segment}"
+    def build(self, **kwargs: str) -> str:
+        return self.value.format(**kwargs)
 
 
 class _TBAConfig(BaseSettings):
@@ -62,7 +62,7 @@ class TBAService:
 
     def get_teams(self, page: int, etag: str | None = None) -> TBAResponse | None:
         response = self._get(
-            endpoint=_TBAEndpoint.TEAMS.add_dynamic(str(page)),
+            endpoint=_TBAEndpoint.TEAMS.build(page=str(page)),
             etag=etag,
         )
 
@@ -95,7 +95,7 @@ class TBAService:
 
     def get_events(self, year: int, etag: str | None = None) -> TBAResponse | None:
         response = self._get(
-            endpoint=_TBAEndpoint.EVENTS.add_dynamic(str(year)),
+            endpoint=_TBAEndpoint.EVENTS.build(year=str(year)),
             etag=etag,
         )
 
@@ -163,7 +163,7 @@ class TBAService:
 
     def get_districts(self, year: int, etag: str | None = None) -> TBAResponse | None:
         response = self._get(
-            endpoint=_TBAEndpoint.DISTRICTS.add_dynamic(str(year)),
+            endpoint=_TBAEndpoint.DISTRICTS.build(year=str(year)),
             etag=etag,
         )
 

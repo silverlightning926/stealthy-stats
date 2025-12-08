@@ -28,7 +28,7 @@ def sync_districts():
         if year == 2021:
             continue
 
-        etag_key = _TBAEndpoint.DISTRICTS.add_dynamic(str(year))
+        etag_key = _TBAEndpoint.DISTRICTS.build(year=str(year))
 
         year = tba.get_districts(
             year=year,

@@ -28,7 +28,7 @@ def sync_events():
         if year == 2021:
             continue
 
-        etag_key = _TBAEndpoint.EVENTS.add_dynamic(str(year))
+        etag_key = _TBAEndpoint.EVENTS.build(year=str(year))
 
         year = tba.get_events(
             year=year,
