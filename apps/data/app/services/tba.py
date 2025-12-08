@@ -6,7 +6,7 @@ import polars as pl
 from pydantic import Field, SecretStr, TypeAdapter
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.models.tba import District, Event, Match, Team
+from app.models.tba import District, Event, Team
 
 
 class _TBAEndpoint(StrEnum):
@@ -29,12 +29,6 @@ class _TBAConfig(BaseSettings):
     api_key: SecretStr = Field(..., min_length=1, validation_alias="TBA_API_KEY")
     base_url: str = "https://www.thebluealliance.com/api/v3"
     timeout_seconds: int = 30  # In Seconds
-
-
-class TBAResponse:
-    def __init__(self, data: pl.DataFrame, etag: str | None):
-        self.data = data
-        self.etag = etag
 
 
 class TBAService:
@@ -61,7 +55,9 @@ class TBAService:
 
         return (req.json(), req.headers.get("ETag"))
 
-    def get_teams(self, page: int, etag: str | None = None) -> TBAResponse | None:
+    def get_teams(
+        self, page: int, etag: str | None = None
+    ) -> tuple[pl.DataFrame, str | None] | None:
         response = self._get(
             endpoint=_TBAEndpoint.TEAMS.build(page=str(page)),
             etag=etag,
@@ -74,8 +70,8 @@ class TBAService:
 
         TypeAdapter(list[Team]).validate_python(data)
 
-        return TBAResponse(
-            data=pl.from_dicts(
+        return (
+            pl.from_dicts(
                 data,
                 schema={
                     "key": pl.Utf8,
@@ -93,10 +89,12 @@ class TBAService:
             ).filter(  # Filter Out Off-Season Demo Teams
                 ~pl.col("nickname").str.contains("(?i)off-?season"),
             ),
-            etag=etag,
+            etag,
         )
 
-    def get_events(self, year: int, etag: str | None = None) -> TBAResponse | None:
+    def get_events(
+        self, year: int, etag: str | None = None
+    ) -> tuple[pl.DataFrame, pl.DataFrame, str | None] | None:
         response = self._get(
             endpoint=_TBAEndpoint.EVENTS.build(year=str(year)),
             etag=etag,
@@ -107,111 +105,68 @@ class TBAService:
 
         data, etag = response
 
-        events_df = (
-            pl.from_dicts(
-                data,
-                schema={
-                    "key": pl.String,
-                    "name": pl.String,
-                    "event_code": pl.String,
-                    "event_type": pl.Int32,
-                    "district": pl.Struct(
-                        {
-                            "key": pl.String,
-                            "abbreviation": pl.String,
-                            "display_name": pl.String,
-                            "year": pl.Int32,
-                        }
-                    ),
-                    "city": pl.String,
-                    "state_prov": pl.String,
-                    "country": pl.String,
-                    "start_date": pl.String,
-                    "end_date": pl.String,
-                    "year": pl.Int32,
-                    "short_name": pl.String,
-                    "event_type_string": pl.String,
-                    "week": pl.Int32,
-                    "address": pl.String,
-                    "postal_code": pl.String,
-                    "gmaps_place_id": pl.String,
-                    "gmaps_url": pl.String,
-                    "lat": pl.Float64,
-                    "lng": pl.Float64,
-                    "location_name": pl.String,
-                    "timezone": pl.String,
-                    "website": pl.String,
-                    "first_event_id": pl.String,
-                    "first_event_code": pl.String,
-                    "division_keys": pl.List(pl.String),
-                    "parent_event_key": pl.String,
-                    "playoff_type": pl.Int32,
-                    "playoff_type_string": pl.String,
-                },
-            )
-            .filter(  # Filter Out Non In-Season Events
-                ~pl.col("event_type").is_in([-1, 7, 99, 100])
-            )
-            .with_columns(
-                pl.col("district").struct.field("key").alias("district_key"),
-                pl.col("start_date").str.to_date(),
-                pl.col("end_date").str.to_date(),
-            )
-            .drop("district")
+        events_df = pl.from_dicts(
+            data,
+            schema={
+                "key": pl.String,
+                "name": pl.String,
+                "event_code": pl.String,
+                "event_type": pl.Int32,
+                "district": pl.Struct(
+                    {
+                        "key": pl.String,
+                        "abbreviation": pl.String,
+                        "display_name": pl.String,
+                        "year": pl.Int32,
+                    }
+                ),
+                "city": pl.String,
+                "state_prov": pl.String,
+                "country": pl.String,
+                "start_date": pl.String,
+                "end_date": pl.String,
+                "year": pl.Int32,
+                "short_name": pl.String,
+                "event_type_string": pl.String,
+                "week": pl.Int32,
+                "address": pl.String,
+                "postal_code": pl.String,
+                "gmaps_place_id": pl.String,
+                "gmaps_url": pl.String,
+                "lat": pl.Float64,
+                "lng": pl.Float64,
+                "location_name": pl.String,
+                "timezone": pl.String,
+                "website": pl.String,
+                "first_event_id": pl.String,
+                "first_event_code": pl.String,
+                "division_keys": pl.List(pl.String),
+                "parent_event_key": pl.String,
+                "playoff_type": pl.Int32,
+                "playoff_type_string": pl.String,
+            },
+        ).filter(  # Filter Out Non In-Season Events
+            ~pl.col("event_type").is_in([-1, 7, 99, 100])
         )
+
+        districts_df = (
+            events_df.select("district")
+            .filter(pl.col("district").is_not_null())
+            .unnest("district")
+            .unique()
+        )
+
+        events_df = events_df.with_columns(
+            pl.col("district").struct.field("key").alias("district_key"),
+            pl.col("start_date").str.to_date(),
+            pl.col("end_date").str.to_date(),
+        ).drop("district")
 
         TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
+        TypeAdapter(list[District]).validate_python(districts_df.to_dicts())
 
-        return TBAResponse(
-            data=events_df,
-            etag=etag,
-        )
-
-    def get_districts(self, year: int, etag: str | None = None) -> TBAResponse | None:
-        response = self._get(
-            endpoint=_TBAEndpoint.DISTRICTS.build(year=str(year)),
-            etag=etag,
-        )
-
-        if response is None:
-            return None
-
-        data, etag = response
-
-        TypeAdapter(list[District]).validate_python(data)
-
-        return TBAResponse(
-            data=pl.from_dicts(
-                data,
-                schema={
-                    "key": pl.String,
-                    "abbreviation": pl.String,
-                    "display_name": pl.String,
-                    "year": pl.Int32,
-                },
-            ),
-            etag=etag,
-        )
-
-    def get_matches(
-        self, event_key: str, etag: str | None = None
-    ) -> TBAResponse | None:
-        response = self._get(
-            endpoint=_TBAEndpoint.MATCHES.build(event_key=event_key),
-            etag=etag,
-        )
-
-        if response is None:
-            return None
-
-        data, etag = response
-
-        # TODO: Transform TBA Matches Response To Match DB Schema
-        matches_df = pl.from_dicts(data)
-
-        TypeAdapter(list[Match]).validate_python(matches_df.to_dicts())
-
-        return TBAResponse(
-            data=matches_df,
-            etag=etag,
+        return (
+            events_df,
+            districts_df,
+            etag,
         )

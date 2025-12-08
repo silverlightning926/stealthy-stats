@@ -13,7 +13,7 @@ from app.services.tba import _TBAEndpoint
 # TODO: Add Logging To Sync Team Task
 @task(
     name="Sync Events",
-    description="Sync FRC events from The Blue Alliance",
+    description="Sync FRC events and districts from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
@@ -22,6 +22,8 @@ def sync_events():
     db = DBService()
 
     events: list[pl.DataFrame] = []
+    districts: list[pl.DataFrame] = []
+
     etags: list[dict[str, str]] = []
 
     for year in range(1992, datetime.now().year + 1):
@@ -30,24 +32,33 @@ def sync_events():
 
         etag_key = _TBAEndpoint.EVENTS.build(year=str(year))
 
-        year = tba.get_events(
+        result = tba.get_events(
             year=year,
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if year is None:  # ETag Hit:
+        if result is None:  # ETag Hit:
             continue  # Skip to next loop iteration
 
-        events.append(year.data)
+        year_events, year_districts, year_etag = result
 
-        if year.etag:
-            etags.append({"endpoint": etag_key, "etag": year.etag})
+        events.append(year_events)
+        districts.append(year_districts)
+
+        if year_etag:
+            etags.append({"endpoint": etag_key, "etag": year_etag})
 
         sleep(1.5)
 
     if events:
-        events_df = pl.concat(events)
+        districts_df = pl.concat(districts)
+        db.upsert(
+            districts_df,
+            table_name="districts",
+            conflict_key="key",
+        )
 
+        events_df = pl.concat(events)
         db.upsert(
             events_df,
             table_name="events",

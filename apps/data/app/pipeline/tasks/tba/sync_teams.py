@@ -27,21 +27,23 @@ def sync_teams():
     for page_num in range(0, 50):
         etag_key = _TBAEndpoint.TEAMS.build(page=str(page_num))
 
-        page = tba.get_teams(
+        result = tba.get_teams(
             page=page_num,
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if page is None:  # ETag Hit:
+        if result is None:  # ETag Hit:
             continue  # Skip to the next loop iteration
 
-        if page.data.is_empty():  # Reached Empty Page:
+        page_teams, page_etag = result
+
+        if page_teams.is_empty():  # Reached Empty Page:
             break  # Break out of the loop
 
-        teams.append(page.data)
+        teams.append(page_teams)
 
-        if page.etag:
-            etags.append({"endpoint": etag_key, "etag": page.etag})
+        if page_etag:
+            etags.append({"endpoint": etag_key, "etag": page_etag})
 
         sleep(1.5)
 
