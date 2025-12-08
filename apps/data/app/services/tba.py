@@ -6,13 +6,14 @@ import polars as pl
 from pydantic import Field, SecretStr, TypeAdapter
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.models.tba import District, Event, Team
+from app.models.tba import District, Event, Match, Team
 
 
 class _TBAEndpoint(StrEnum):
     TEAMS = "/teams/{page}"
     EVENTS = "/events/{year}"
     DISTRICTS = "/districts/{year}"
+    MATCHES = "/event/{event_key}/matches"
 
     def build(self, **kwargs: str) -> str:
         return self.value.format(**kwargs)
@@ -184,5 +185,28 @@ class TBAService:
                     "year": pl.Int32,
                 },
             ),
+            etag=etag,
+        )
+
+    def get_matches(
+        self, event_key: str, etag: str | None = None
+    ) -> TBAResponse | None:
+        response = self._get(
+            endpoint=_TBAEndpoint.MATCHES.build(event_key=event_key),
+            etag=etag,
+        )
+
+        if response is None:
+            return None
+
+        data, etag = response
+
+        # TODO: Transform TBA Matches Response To Match DB Schema
+        matches_df = pl.from_dicts(data)
+
+        TypeAdapter(list[Match]).validate_python(matches_df.to_dicts())
+
+        return TBAResponse(
+            data=matches_df,
             etag=etag,
         )
