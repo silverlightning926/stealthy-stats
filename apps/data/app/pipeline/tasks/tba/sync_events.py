@@ -6,7 +6,6 @@ from prefect import task
 from pydantic import TypeAdapter
 
 from app.models import ETag
-from app.models.tba import Event
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 
@@ -49,8 +48,6 @@ def sync_events():
     if events:
         events_df = pl.concat(events)
 
-        TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
-
         db.upsert(
             events_df,
             table_name="events",
@@ -58,9 +55,9 @@ def sync_events():
         )
 
         if etags:
-            etags_df = pl.DataFrame(etags)
+            TypeAdapter(list[ETag]).validate_python(etags)
 
-            TypeAdapter(list[ETag]).validate_python(etags_df.to_dicts())
+            etags_df = pl.DataFrame(etags)
 
             db.upsert(
                 etags_df,

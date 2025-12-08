@@ -3,8 +3,10 @@ from typing import Any
 
 import httpx
 import polars as pl
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, TypeAdapter
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.models.tba import District, Event, Team
 
 
 class _TBAEndpoint(StrEnum):
@@ -68,6 +70,9 @@ class TBAService:
             return None
 
         data, etag = response
+
+        TypeAdapter(list[Team]).validate_python(data)
+
         return TBAResponse(
             data=pl.from_dicts(
                 data,
@@ -98,6 +103,9 @@ class TBAService:
             return None
 
         data, etag = response
+
+        TypeAdapter(list[Event]).validate_python(data)
+
         return TBAResponse(
             data=pl.from_dicts(
                 data,
@@ -159,6 +167,9 @@ class TBAService:
             return None
 
         data, etag = response
+
+        TypeAdapter(list[District]).validate_python(data)
+
         return TBAResponse(
             data=pl.from_dicts(
                 data,

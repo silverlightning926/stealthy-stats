@@ -5,7 +5,6 @@ from prefect import task
 from pydantic import TypeAdapter
 
 from app.models import ETag
-from app.models.tba import Team
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 
@@ -49,8 +48,6 @@ def sync_teams():
     if teams:
         teams_df = pl.concat(teams)
 
-        TypeAdapter(list[Team]).validate_python(teams_df.to_dicts())
-
         db.upsert(
             teams_df,
             table_name="teams",
@@ -58,9 +55,9 @@ def sync_teams():
         )
 
         if etags:
-            etags_df = pl.DataFrame(etags)
+            TypeAdapter(list[ETag]).validate_python(etags)
 
-            TypeAdapter(list[ETag]).validate_python(etags_df.to_dicts())
+            etags_df = pl.DataFrame(etags)
 
             db.upsert(
                 etags_df,
