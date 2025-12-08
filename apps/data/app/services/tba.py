@@ -104,10 +104,8 @@ class TBAService:
 
         data, etag = response
 
-        TypeAdapter(list[Event]).validate_python(data)
-
-        return TBAResponse(
-            data=pl.from_dicts(
+        events_df = (
+            pl.from_dicts(
                 data,
                 schema={
                     "key": pl.String,
@@ -153,7 +151,13 @@ class TBAService:
                 pl.col("start_date").str.to_date(),
                 pl.col("end_date").str.to_date(),
             )
-            .drop("district"),
+            .drop("district")
+        )
+
+        TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
+
+        return TBAResponse(
+            data=events_df,
             etag=etag,
         )
 
