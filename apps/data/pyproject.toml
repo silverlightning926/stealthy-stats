@@ -20,5 +20,9 @@ dev = [
   "taskipy>=1.14.1",
 ]
 
+[tool.taskipy.tasks]
+server = "prefect server start"
+start = "python main.py"
+
 [tool.uv]
 package = false
