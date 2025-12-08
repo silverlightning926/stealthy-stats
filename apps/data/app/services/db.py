@@ -68,8 +68,3 @@ class DBService:
         with self.get_session() as session:
             existing_etag = session.get(ETag, endpoint)
             return existing_etag.etag if existing_etag else None
-
-    def upsert_etag(self, endpoint: str, etag: str) -> None:
-        with self.get_session() as session:
-            new_etag = ETag(endpoint=endpoint, etag=etag)
-            session.merge(new_etag)

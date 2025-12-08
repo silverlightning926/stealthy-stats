@@ -4,6 +4,7 @@ import polars as pl
 from prefect import task
 from pydantic import TypeAdapter
 
+from app.models import ETag
 from app.models.tba import Team
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
@@ -21,6 +22,7 @@ def sync_teams():
     db = DBService()
 
     teams: list[pl.DataFrame] = []
+    etags: list[dict[str, str]] = []
 
     # Upper bound for safety - should break loop if it hits an empty page before upper bound
     for page_num in range(0, 50):
@@ -40,10 +42,7 @@ def sync_teams():
         teams.append(page.data)
 
         if page.etag:
-            db.upsert_etag(
-                endpoint=etag_key,
-                etag=page.etag,
-            )
+            etags.append({"endpoint": etag_key, "etag": page.etag})
 
         sleep(1.5)
 
@@ -57,3 +56,14 @@ def sync_teams():
             table_name="teams",
             conflict_key="key",
         )
+
+        if etags:
+            etags_df = pl.DataFrame(etags)
+
+            TypeAdapter(list[ETag]).validate_python(etags_df.to_dicts())
+
+            db.upsert(
+                etags_df,
+                table_name="etags",
+                conflict_key="endpoint",
+            )

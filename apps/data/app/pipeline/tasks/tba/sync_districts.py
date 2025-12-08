@@ -5,6 +5,7 @@ import polars as pl
 from prefect import task
 from pydantic import TypeAdapter
 
+from app.models import ETag
 from app.models.tba import District
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
@@ -22,6 +23,7 @@ def sync_districts():
     db = DBService()
 
     districts: list[pl.DataFrame] = []
+    etags: list[dict[str, str]] = []
 
     for year in range(1992, datetime.now().year + 1):
         if year == 2021:
@@ -40,10 +42,7 @@ def sync_districts():
         districts.append(year.data)
 
         if year.etag:
-            db.upsert_etag(
-                endpoint=etag_key,
-                etag=year.etag,
-            )
+            etags.append({"endpoint": etag_key, "etag": year.etag})
 
         sleep(1.5)
 
@@ -57,3 +56,14 @@ def sync_districts():
             table_name="districts",
             conflict_key="key",
         )
+
+        if etags:
+            etags_df = pl.DataFrame(etags)
+
+            TypeAdapter(list[ETag]).validate_python(etags_df.to_dicts())
+
+            db.upsert(
+                etags_df,
+                table_name="etags",
+                conflict_key="endpoint",
+            )
