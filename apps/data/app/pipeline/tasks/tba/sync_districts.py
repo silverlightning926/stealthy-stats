@@ -13,7 +13,7 @@ from app.services.tba import _TBAEndpoint
 # TODO: Add Logging To Sync Team Task
 @task(
     name="Sync Districts",
-    description="Sync FRC Districts From The Blue Alliance",
+    description="Sync FRC districts from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
