@@ -21,8 +21,22 @@ dev = [
 ]
 
 [tool.taskipy.tasks]
+# Combined checks
+check = "task lint && task format && task type"
+"check:fix" = "task lint:fix && task format:fix"
+# Formatting
+format = "ruff format . --check"
+"format:diff" = "ruff format . --diff"
+"format:fix" = "ruff format ."
+# Linting
+lint = "ruff check ."
+"lint:fix" = "ruff check . --fix"
+"lint:watch" = "ruff check . --watch"
+# Pipeline
 server = "prefect server start"
 start = "python main.py"
+# Type checking
+type = "pyright ."
 
 [tool.uv]
 package = false
