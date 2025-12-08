@@ -45,8 +45,7 @@ class DBService:
 
     def upsert(self, df: pl.DataFrame, table_name: str, conflict_key: str):
         with self.get_session() as session:
-            columns = df.columns
-            records = [dict(zip(columns, row)) for row in df.iter_rows()]
+            records = df.to_dicts()
 
             if not records:
                 return
@@ -54,9 +53,10 @@ class DBService:
             metadata = MetaData()
             table = Table(table_name, metadata, autoload_with=self.engine)
 
-            update_cols = {c: table.c[c] for c in columns if c != conflict_key}
-
             stmt = insert(table).values(records)
+
+            update_cols = {c: stmt.excluded[c] for c in df.columns if c != conflict_key}
+
             upsert_stmt = stmt.on_conflict_do_update(
                 index_elements=[conflict_key],
                 set_=update_cols,
