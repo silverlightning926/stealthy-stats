@@ -90,6 +90,8 @@ class TBAService:
                     "website": pl.Utf8,
                     "rookie_year": pl.Int32,
                 },
+            ).filter(  # Filter Out Off-Season Demo Teams
+                ~pl.col("nickname").str.contains("(?i)off-?season"),
             ),
             etag=etag,
         )
@@ -146,6 +148,9 @@ class TBAService:
                     "playoff_type": pl.Int32,
                     "playoff_type_string": pl.String,
                 },
+            )
+            .filter(  # Filter Out Non In-Season Events
+                ~pl.col("event_type").is_in([-1, 7, 99, 100])
             )
             .with_columns(
                 pl.col("district").struct.field("key").alias("district_key"),
