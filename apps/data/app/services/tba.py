@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pprint import pprint
 from typing import Any
 
 import httpx
@@ -6,7 +7,7 @@ import polars as pl
 from pydantic import Field, SecretStr, TypeAdapter
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.models.tba import District, Event, Team
+from app.models.tba import District, Event, Match, MatchAlliance, Team
 
 
 class _TBAEndpoint(StrEnum):
@@ -168,5 +169,134 @@ class TBAService:
         return (
             events_df,
             districts_df,
+            etag,
+        )
+
+    def get_matches(
+        self, event_key: str, etag: str | None = None
+    ) -> tuple[pl.DataFrame, pl.DataFrame, str | None] | None:
+        response = self._get(
+            endpoint=_TBAEndpoint.MATCHES.build(event_key=str(event_key)),
+            etag=etag,
+        )
+
+        if response is None:
+            return None
+
+        data, etag = response
+
+        matches_df = pl.from_dicts(
+            data,
+            schema={
+                "key": pl.String,
+                "comp_level": pl.String,
+                "set_number": pl.Int32,
+                "match_number": pl.Int32,
+                "alliances": pl.Struct(
+                    {
+                        "red": pl.Struct(
+                            {
+                                "score": pl.Int32,
+                                "team_keys": pl.List(pl.String),
+                                "surrogate_team_keys": pl.List(pl.String),
+                                "dq_team_keys": pl.List(pl.String),
+                            }
+                        ),
+                        "blue": pl.Struct(
+                            {
+                                "score": pl.Int32,
+                                "team_keys": pl.List(pl.String),
+                                "surrogate_team_keys": pl.List(pl.String),
+                                "dq_team_keys": pl.List(pl.String),
+                            }
+                        ),
+                    }
+                ),
+                "winning_alliance": pl.String,
+                "event_key": pl.String,
+                "time": pl.Int64,
+                "actual_time": pl.Int64,
+                "predicted_time": pl.Int64,
+                "post_result_time": pl.Int64,
+                "score_breakdown": pl.Object,
+            },
+        ).with_columns(
+            [
+                pl.from_epoch("time", time_unit="s"),
+                pl.from_epoch("actual_time", time_unit="s"),
+                pl.from_epoch("predicted_time", time_unit="s"),
+                pl.from_epoch("post_result_time", time_unit="s"),
+            ]
+        )
+
+        match_alliances_df = pl.concat(
+            [
+                matches_df.select(
+                    [
+                        pl.col("key").alias("match_key"),
+                        pl.lit("red").alias("alliance_color"),
+                        pl.col("alliances")
+                        .struct.field("red")
+                        .struct.field("score")
+                        .alias("score"),
+                        pl.col("alliances")
+                        .struct.field("red")
+                        .struct.field("team_keys")
+                        .alias("team_keys"),
+                        pl.col("alliances")
+                        .struct.field("red")
+                        .struct.field("surrogate_team_keys")
+                        .alias("surrogate_team_keys"),
+                        pl.col("alliances")
+                        .struct.field("red")
+                        .struct.field("dq_team_keys")
+                        .alias("dq_team_keys"),
+                        pl.col("score_breakdown")
+                        .map_elements(
+                            lambda x: x.get("red") if x else None,
+                            return_dtype=pl.Object,
+                        )
+                        .alias("score_breakdown"),
+                    ]
+                ),
+                matches_df.select(
+                    [
+                        pl.col("key").alias("match_key"),
+                        pl.lit("blue").alias("alliance_color"),
+                        pl.col("alliances")
+                        .struct.field("blue")
+                        .struct.field("score")
+                        .alias("score"),
+                        pl.col("alliances")
+                        .struct.field("blue")
+                        .struct.field("team_keys")
+                        .alias("team_keys"),
+                        pl.col("alliances")
+                        .struct.field("blue")
+                        .struct.field("surrogate_team_keys")
+                        .alias("surrogate_team_keys"),
+                        pl.col("alliances")
+                        .struct.field("blue")
+                        .struct.field("dq_team_keys")
+                        .alias("dq_team_keys"),
+                        pl.col("score_breakdown")
+                        .map_elements(
+                            lambda x: x.get("blue") if x else None,
+                            return_dtype=pl.Object,
+                        )
+                        .alias("score_breakdown"),
+                    ]
+                ),
+            ]
+        )
+
+        matches_df = matches_df.drop(["alliances", "score_breakdown"])
+
+        TypeAdapter(list[Match]).validate_python(matches_df.to_dicts())
+        TypeAdapter(list[MatchAlliance]).validate_python(match_alliances_df.to_dicts())
+
+        return (
+            matches_df,
+            match_alliances_df,
             etag,
         )

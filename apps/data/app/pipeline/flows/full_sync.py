@@ -12,3 +12,4 @@ from app.pipeline.tasks.tba import sync_events, sync_teams
 def full_sync():
     sync_teams()
     sync_events()
+    sync_teams()

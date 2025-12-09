@@ -5,7 +5,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models import ETag  # noqa: F401
 from app.models.tba import District, Event, Team  # noqa: F401
@@ -68,3 +68,7 @@ class DBService:
         with self.get_session() as session:
             existing_etag = session.get(ETag, endpoint)
             return existing_etag.etag if existing_etag else None
+
+    def get_event_keys(self) -> list[str]:
+        with self.get_session() as session:
+            return list(session.exec(select(Event.key)).all())
