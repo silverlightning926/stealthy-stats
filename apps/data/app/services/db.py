@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import polars as pl
 from pydantic import Field, SecretStr
@@ -72,14 +73,31 @@ class DBService:
 
     def get_event_keys(self, active_only: bool = False) -> list[str]:
         with self.get_session() as session:
-            query = select(Event.key)
+            if not active_only:
+                query = select(Event.key)
+                return list(session.exec(query).all())
 
-            if active_only:
-                now = datetime.now()
-                buffer = timedelta(days=1)
-                query = query.where(  # TODO: Check Timezones
-                    Event.start_date <= now + buffer,
-                    Event.end_date >= now - buffer,
+            query = select(Event)
+            events = session.exec(query).all()
+
+            buffer = timedelta(
+                days=1,
+                hours=2,
+            )
+            active_keys = []
+
+            for event in events:
+                event_tz = (
+                    ZoneInfo(event.timezone)
+                    if event.timezone
+                    else ZoneInfo("UTC")  # If Timezone is missing, assume UTC
                 )
+                now_in_event_tz = datetime.now(event_tz).date()
 
-            return list(session.exec(query).all())
+                event_start_with_buffer = event.start_date - buffer
+                event_end_with_buffer = event.end_date + buffer
+
+                if event_start_with_buffer <= now_in_event_tz <= event_end_with_buffer:
+                    active_keys.append(event.key)
+
+            return active_keys
