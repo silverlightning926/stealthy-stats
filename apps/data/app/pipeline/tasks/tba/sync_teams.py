@@ -56,13 +56,13 @@ def sync_teams():
             conflict_key="key",
         )
 
-        if etags:
-            TypeAdapter(list[ETag]).validate_python(etags)
+    if etags:
+        TypeAdapter(list[ETag]).validate_python(etags)
 
-            etags_df = pl.DataFrame(etags)
+        etags_df = pl.DataFrame(etags)
 
-            db.upsert(
-                etags_df,
-                table_name="etags",
-                conflict_key="endpoint",
-            )
+        db.upsert(
+            etags_df,
+            table_name="etags",
+            conflict_key="endpoint",
+        )

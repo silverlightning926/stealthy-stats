@@ -50,7 +50,7 @@ def sync_events():
 
         sleep(1.5)
 
-    if events:
+    if districts:
         districts_df = pl.concat(districts)
         db.upsert(
             districts_df,
@@ -58,6 +58,7 @@ def sync_events():
             conflict_key="key",
         )
 
+    if events:
         events_df = pl.concat(events)
         db.upsert(
             events_df,
@@ -65,13 +66,13 @@ def sync_events():
             conflict_key="key",
         )
 
-        if etags:
-            TypeAdapter(list[ETag]).validate_python(etags)
+    if etags:
+        TypeAdapter(list[ETag]).validate_python(etags)
 
-            etags_df = pl.DataFrame(etags)
+        etags_df = pl.DataFrame(etags)
 
-            db.upsert(
-                etags_df,
-                table_name="etags",
-                conflict_key="endpoint",
-            )
+        db.upsert(
+            etags_df,
+            table_name="etags",
+            conflict_key="endpoint",
+        )

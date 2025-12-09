@@ -46,7 +46,7 @@ def sync_matches():
 
         sleep(1.5)
 
-    if matches:
+    if match_alliances:
         match_alliances_df = pl.concat(match_alliances)
         db.upsert(
             match_alliances_df,
@@ -54,6 +54,7 @@ def sync_matches():
             conflict_key="key",
         )
 
+    if matches:
         matches_df = pl.concat(matches)
         db.upsert(
             matches_df,
@@ -61,13 +62,13 @@ def sync_matches():
             conflict_key="key",
         )
 
-        if etags:
-            TypeAdapter(list[ETag]).validate_python(etags)
+    if etags:
+        TypeAdapter(list[ETag]).validate_python(etags)
 
-            etags_df = pl.DataFrame(etags)
+        etags_df = pl.DataFrame(etags)
 
-            db.upsert(
-                etags_df,
-                table_name="etags",
-                conflict_key="endpoint",
-            )
+        db.upsert(
+            etags_df,
+            table_name="etags",
+            conflict_key="endpoint",
+        )
