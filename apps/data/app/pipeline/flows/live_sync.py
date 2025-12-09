@@ -1,6 +1,7 @@
 from prefect import flow
 
 from app.pipeline.tasks.tba import sync_matches
+from app.services import DBService
 
 
 @flow(
@@ -10,4 +11,9 @@ from app.pipeline.tasks.tba import sync_matches
     retry_delay_seconds=30,
 )
 def live_sync():
+    db = DBService()
+
+    if not db.get_event_keys(active_only=True):
+        return
+
     sync_matches(active_only=True)

@@ -77,7 +77,7 @@ class DBService:
             if active_only:
                 now = datetime.now()
                 buffer = timedelta(days=1)
-                query = query.where(
+                query = query.where(  # TODO: Check Timezones
                     Event.start_date <= now + buffer,
                     Event.end_date >= now - buffer,
                 )
