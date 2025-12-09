@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 import polars as pl
 from pydantic import Field, SecretStr
@@ -69,6 +70,16 @@ class DBService:
             existing_etag = session.get(ETag, endpoint)
             return existing_etag.etag if existing_etag else None
 
-    def get_event_keys(self) -> list[str]:
+    def get_event_keys(self, active_only: bool = False) -> list[str]:
         with self.get_session() as session:
-            return list(session.exec(select(Event.key)).all())
+            query = select(Event.key)
+
+            if active_only:
+                now = datetime.now()
+                buffer = timedelta(days=1)
+                query = query.where(
+                    Event.start_date <= now + buffer,
+                    Event.end_date >= now - buffer,
+                )
+
+            return list(session.exec(query).all())

@@ -16,7 +16,7 @@ from app.services.tba import _TBAEndpoint
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_matches():
+def sync_matches(active_only: bool = False):
     tba = TBAService()
     db = DBService()
 
@@ -25,7 +25,7 @@ def sync_matches():
 
     etags: list[dict[str, str]] = []
 
-    for event in db.get_event_keys():
+    for event in db.get_event_keys(active_only=active_only):
         etag_key = _TBAEndpoint.MATCHES.build(event_key=event)
 
         result = tba.get_matches(
@@ -44,7 +44,7 @@ def sync_matches():
         if event_etag:
             etags.append({"endpoint": etag_key, "etag": event_etag})
 
-        sleep(1.5)
+        sleep(3.0)
 
     if match_alliances:
         match_alliances_df = pl.concat(match_alliances)
