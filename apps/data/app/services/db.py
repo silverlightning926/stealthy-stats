@@ -45,6 +45,7 @@ class DBService:
         finally:
             session.close()
 
+    # TODO: Evaluate Tenacity Retrying On DB Service Upsert Function
     def upsert(self, df: pl.DataFrame, table_name: str, conflict_key: str):
         with self.get_session() as session:
             records = df.to_dicts()

@@ -5,6 +5,12 @@ import httpx
 import polars as pl
 from pydantic import Field, SecretStr, TypeAdapter
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.models.tba import District, Event, Match, MatchAlliance, Team
 
@@ -35,6 +41,12 @@ class TBAService:
     def __init__(self):
         self.config = _TBAConfig()  # pyright: ignore[reportCallIssue]
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.HTTPError),
+        reraise=True,
+    )
     def _get(
         self, endpoint: str, etag: str | None = None
     ) -> tuple[list[dict[str, Any]], str | None] | None:
