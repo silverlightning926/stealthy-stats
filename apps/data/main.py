@@ -13,7 +13,7 @@ def main():
     )
 
     live_sync_deployment = live_sync.to_deployment(
-        name="live-sync-deployment", interval=timedelta(minutes=3)
+        name="live-sync-deployment", interval=timedelta(minutes=10)
     )
 
     serve(full_sync_deployment, live_sync_deployment)  # type: ignore
