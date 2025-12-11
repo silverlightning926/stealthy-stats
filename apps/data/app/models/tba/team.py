@@ -1,4 +1,9 @@
-from sqlmodel import Field, SQLModel
+from typing import TYPE_CHECKING
+
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from .ranking import Ranking
 
 
 class Team(SQLModel, table=True):
@@ -47,3 +52,5 @@ class Team(SQLModel, table=True):
         description="First year the team officially competed",
         ge=1992,
     )
+
+    rankings: list["Ranking"] = Relationship(back_populates="team")
