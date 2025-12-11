@@ -12,7 +12,15 @@ from tenacity import (
     wait_exponential,
 )
 
-from app.models.tba import District, Event, Match, MatchAlliance, Ranking, Team
+from app.models.tba import (
+    District,
+    Event,
+    EventRankingInfo,
+    Match,
+    MatchAlliance,
+    Ranking,
+    Team,
+)
 
 
 class _TBAEndpoint(StrEnum):
@@ -313,7 +321,7 @@ class TBAService:
 
     def get_rankings(
         self, event_key: str, etag: str | None = None
-    ) -> tuple[pl.DataFrame, str | None] | None:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, str | None] | None:
         response = self._get(
             endpoint=_TBAEndpoint.RANKINGS.build(event_key=event_key),
             etag=etag,
@@ -340,6 +348,8 @@ class TBAService:
                             "ties": pl.Int32,
                         }
                     ),
+                    "extra_stats": pl.List(pl.Float64),
+                    "sort_orders": pl.List(pl.Float64),
                 },
             )
             .unnest("record")
@@ -347,9 +357,42 @@ class TBAService:
             .select("event_key", pl.all().exclude("event_key"))
         )
 
+        ranking_info_df = (
+            pl.from_dicts(
+                [
+                    {
+                        "extra_stats_info": data.get("extra_stats_info", []),
+                        "sort_order_info": data.get("sort_order_info", []),
+                    }
+                ],
+                schema={
+                    "extra_stats_info": pl.List(
+                        pl.Struct(
+                            {
+                                "name": pl.String,
+                                "precision": pl.Int32,
+                            }
+                        )
+                    ),
+                    "sort_order_info": pl.List(
+                        pl.Struct(
+                            {
+                                "name": pl.String,
+                                "precision": pl.Int32,
+                            }
+                        )
+                    ),
+                },
+            )
+            .with_columns(pl.lit(event_key).alias("event_key"))
+            .select("event_key", pl.all().exclude("event_key"))
+        )
+
         TypeAdapter(list[Ranking]).validate_python(rankings_df.to_dicts())
+        TypeAdapter(list[EventRankingInfo]).validate_python(ranking_info_df.to_dicts())
 
         return (
             rankings_df,
+            ranking_info_df,
             etag,
         )

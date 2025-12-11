@@ -10,7 +10,14 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models import ETag  # noqa: F401
-from app.models.tba import District, Event, Ranking, Team  # noqa: F401
+from app.models.tba import (  # noqa: F401
+    District,
+    Event,
+    EventRankingInfo,
+    Ranking,
+    RankingInfo,
+    Team,
+)
 
 
 class _DBConfig(BaseSettings):

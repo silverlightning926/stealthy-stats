@@ -6,6 +6,7 @@ from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .district import District
+    from .event_ranking_info import EventRankingInfo
     from .match import Match
     from .ranking import Ranking
 
@@ -164,3 +165,4 @@ class Event(SQLModel, table=True):
     district: Optional["District"] = Relationship(back_populates="events")
     matches: list["Match"] = Relationship(back_populates="event")
     rankings: list["Ranking"] = Relationship(back_populates="event")
+    ranking_info: Optional["EventRankingInfo"] = Relationship(back_populates="event")

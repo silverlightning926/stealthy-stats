@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import JSON
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .event import Event
@@ -58,6 +59,18 @@ class Ranking(SQLModel, table=True):
     ties: int = Field(
         description="Number of ties.",
         ge=0,
+    )
+
+    extra_stats: list[int] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="Additional statistics for this ranking. Year specific.",
+    )
+
+    sort_orders: list[float] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="Sort order values used for ranking calculations. Year specific.",
     )
 
     event: "Event" = Relationship(back_populates="rankings")
