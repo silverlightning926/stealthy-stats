@@ -12,7 +12,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from app.models.tba import District, Event, Match, MatchAlliance, Team
+from app.models.tba import District, Event, Match, MatchAlliance, Ranking, Team
 
 
 class _TBAEndpoint(StrEnum):
@@ -20,6 +20,7 @@ class _TBAEndpoint(StrEnum):
     EVENTS = "/events/{year}"
     DISTRICTS = "/districts/{year}"
     MATCHES = "/event/{event_key}/matches"
+    RANKINGS = "/event/{event_key}/rankings"
 
     def build(self, **kwargs: str) -> str:
         return self.value.format(**kwargs)
@@ -47,9 +48,7 @@ class TBAService:
         retry=retry_if_exception_type(httpx.HTTPError),
         reraise=True,
     )
-    def _get(
-        self, endpoint: str, etag: str | None = None
-    ) -> tuple[list[dict[str, Any]], str | None] | None:
+    def _get(self, endpoint: str, etag: str | None = None) -> Any | None:
         headers = {"X-TBA-Auth-Key": self.config.api_key.get_secret_value()}
         if etag is not None:
             headers["If-None-Match"] = etag
@@ -309,5 +308,48 @@ class TBAService:
         return (
             matches_df,
             match_alliances_df,
+            etag,
+        )
+
+    def get_rankings(
+        self, event_key: str, etag: str | None = None
+    ) -> tuple[pl.DataFrame, str | None] | None:
+        response = self._get(
+            endpoint=_TBAEndpoint.RANKINGS.build(event_key=event_key),
+            etag=etag,
+        )
+
+        if response is None:
+            return None
+
+        data, etag = response
+
+        rankings_df = (
+            pl.from_dicts(
+                data.get("rankings", []),
+                schema={
+                    "team_key": pl.String,
+                    "rank": pl.Int32,
+                    "matches_played": pl.Int32,
+                    "qual_average": pl.Int32,
+                    "dq": pl.Int32,
+                    "record": pl.Struct(
+                        {
+                            "wins": pl.Int32,
+                            "losses": pl.Int32,
+                            "ties": pl.Int32,
+                        }
+                    ),
+                },
+            )
+            .unnest("record")
+            .with_columns(pl.lit(event_key).alias("event_key"))
+            .select("event_key", pl.all().exclude("event_key"))
+        )
+
+        TypeAdapter(list[Ranking]).validate_python(rankings_df.to_dicts())
+
+        return (
+            rankings_df,
             etag,
         )
