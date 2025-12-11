@@ -40,13 +40,13 @@ def sync_events():
         if result is None:  # ETag Hit:
             continue  # Skip to next loop iteration
 
-        year_events, year_districts, year_etag = result
+        year_events, year_districts, etag = result
 
         events.append(year_events)
         districts.append(year_districts)
 
-        if year_etag:
-            etags.append({"endpoint": etag_key, "etag": year_etag})
+        if etag:
+            etags.append({"endpoint": etag_key, "etag": etag})
 
         sleep(1.5)
 

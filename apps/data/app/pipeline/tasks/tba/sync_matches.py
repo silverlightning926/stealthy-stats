@@ -36,13 +36,13 @@ def sync_matches(active_only: bool = False):
         if result is None:  # ETag Hit:
             continue  # Skip to next loop iteration
 
-        event_matches, event_match_alliances, event_etag = result
+        event_matches, event_match_alliances, etag = result
 
         matches.append(event_matches)
         match_alliances.append(event_match_alliances)
 
-        if event_etag:
-            etags.append({"endpoint": etag_key, "etag": event_etag})
+        if etag:
+            etags.append({"endpoint": etag_key, "etag": etag})
 
         sleep(3.0)
 

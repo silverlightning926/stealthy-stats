@@ -36,13 +36,13 @@ def sync_rankings(active_only: bool = False):
         if result is None:  # ETag Hit:
             continue  # Skip to next loop iteration
 
-        event_rankings, event_rankings_info, event_etag = result
+        event_rankings, event_rankings_info, etag = result
 
         rankings.append(event_rankings)
         ranking_infos.append(event_rankings_info)
 
-        if event_etag:
-            etags.append({"endpoint": etag_key, "etag": event_etag})
+        if etag:
+            etags.append({"endpoint": etag_key, "etag": etag})
 
         sleep(3.0)
 

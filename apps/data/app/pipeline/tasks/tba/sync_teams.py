@@ -35,15 +35,15 @@ def sync_teams():
         if result is None:  # ETag Hit:
             continue  # Skip to the next loop iteration
 
-        page_teams, page_etag = result
+        page_teams, etag = result
 
         if page_teams.is_empty():  # Reached Empty Page:
             break  # Break out of the loop
 
         teams.append(page_teams)
 
-        if page_etag:
-            etags.append({"endpoint": etag_key, "etag": page_etag})
+        if etag:
+            etags.append({"endpoint": etag_key, "etag": etag})
 
         sleep(1.5)
 
