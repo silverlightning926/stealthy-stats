@@ -7,9 +7,8 @@ from sqlmodel import Column, Field, Relationship, SQLModel
 if TYPE_CHECKING:
     from .alliance import Alliance
     from .district import District
-    from .event_ranking_info import EventRankingInfo
     from .match import Match
-    from .ranking import Ranking
+    from .ranking import EventRankingInfo, Ranking
 
 
 class Event(SQLModel, table=True):
