@@ -108,8 +108,8 @@ class TBAService:
                     "rookie_year": pl.Int32,
                 },
             )
-            .filter(  # Filter Out Off-Season Demo Teams
-                ~pl.col("nickname").str.contains("(?i)off-?season"),
+            .filter(  # Filter Out Off-season Demo Teams (9970-9999)
+                ~pl.col("team_number").is_between(9970, 9999),
             )
             .select("key", pl.all().exclude("key")),
             etag,
@@ -260,69 +260,112 @@ class TBAService:
             .select("key", pl.all().exclude("key"))
         )
 
-        match_alliances_df = pl.concat(
-            [
-                matches_df.select(
-                    [
-                        pl.col("key").alias("match_key"),
-                        pl.lit("red").alias("alliance_color"),
-                        pl.col("alliances")
-                        .struct.field("red")
-                        .struct.field("score")
-                        .alias("score"),
-                        pl.col("alliances")
-                        .struct.field("red")
-                        .struct.field("team_keys")
-                        .alias("team_keys"),
-                        pl.col("alliances")
-                        .struct.field("red")
-                        .struct.field("surrogate_team_keys")
-                        .alias("surrogate_team_keys"),
-                        pl.col("alliances")
-                        .struct.field("red")
-                        .struct.field("dq_team_keys")
-                        .alias("dq_team_keys"),
-                        pl.col("score_breakdown")
-                        .map_elements(
-                            lambda x: x.get("red") if x else None,
-                            return_dtype=pl.Object,
-                        )
-                        .alias("score_breakdown"),
-                    ]
-                ),
-                matches_df.select(
-                    [
-                        pl.col("key").alias("match_key"),
-                        pl.lit("blue").alias("alliance_color"),
-                        pl.col("alliances")
-                        .struct.field("blue")
-                        .struct.field("score")
-                        .alias("score"),
-                        pl.col("alliances")
-                        .struct.field("blue")
-                        .struct.field("team_keys")
-                        .alias("team_keys"),
-                        pl.col("alliances")
-                        .struct.field("blue")
-                        .struct.field("surrogate_team_keys")
-                        .alias("surrogate_team_keys"),
-                        pl.col("alliances")
-                        .struct.field("blue")
-                        .struct.field("dq_team_keys")
-                        .alias("dq_team_keys"),
-                        pl.col("score_breakdown")
-                        .map_elements(
-                            lambda x: x.get("blue") if x else None,
-                            return_dtype=pl.Object,
-                        )
-                        .alias("score_breakdown"),
-                    ]
-                ),
-            ]
-        ).select(
-            "match_key",
-            "alliance_color",
-            pl.all().exclude("match_key", "alliance_color"),
+        match_alliances_df = (
+            pl.concat(
+                [
+                    matches_df.select(
+                        [
+                            pl.col("key").alias("match_key"),
+                            pl.lit("red").alias("alliance_color"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("score")
+                            .alias("score"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("team_keys")
+                            .alias("team_keys"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("surrogate_team_keys")
+                            .alias("surrogate_team_keys"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("dq_team_keys")
+                            .alias("dq_team_keys"),
+                            pl.col("score_breakdown")
+                            .map_elements(
+                                lambda x: x.get("red") if x else None,
+                                return_dtype=pl.Object,
+                            )
+                            .alias("score_breakdown"),
+                        ]
+                    ),
+                    matches_df.select(
+                        [
+                            pl.col("key").alias("match_key"),
+                            pl.lit("blue").alias("alliance_color"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("score")
+                            .alias("score"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("team_keys")
+                            .alias("team_keys"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("surrogate_team_keys")
+                            .alias("surrogate_team_keys"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("dq_team_keys")
+                            .alias("dq_team_keys"),
+                            pl.col("score_breakdown")
+                            .map_elements(
+                                lambda x: x.get("blue") if x else None,
+                                return_dtype=pl.Object,
+                            )
+                            .alias("score_breakdown"),
+                        ]
+                    ),
+                ]
+            )
+            .with_columns(  # Filter Out Off-season Demo Teams (9970-9999)
+                [
+                    pl.col("team_keys")
+                    .list.eval(
+                        pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
+                    )
+                    .list.eval(
+                        pl.when(pl.element().is_between(9970, 9999))
+                        .then(None)
+                        .otherwise(pl.element())
+                    )
+                    .list.drop_nulls()
+                    .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
+                    .alias("team_keys"),
+                    pl.col("surrogate_team_keys")
+                    .list.eval(
+                        pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
+                    )
+                    .list.eval(
+                        pl.when(pl.element().is_between(9970, 9999))
+                        .then(None)
+                        .otherwise(pl.element())
+                    )
+                    .list.drop_nulls()
+                    .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
+                    .alias("surrogate_team_keys"),
+                    pl.col("dq_team_keys")
+                    .list.eval(
+                        pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
+                    )
+                    .list.eval(
+                        pl.when(pl.element().is_between(9970, 9999))
+                        .then(None)
+                        .otherwise(pl.element())
+                    )
+                    .list.drop_nulls()
+                    .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
+                    .alias("dq_team_keys"),
+                ]
+            )
+            .select(
+                "match_key",
+                "alliance_color",
+                pl.all().exclude("match_key", "alliance_color"),
+            )
         )
 
         matches_df = matches_df.drop("alliances", "score_breakdown")
@@ -372,6 +415,12 @@ class TBAService:
             .unnest("record")
             .with_columns(pl.lit(event_key).alias("event_key"))
             .select("event_key", "team_key", pl.all().exclude("event_key", "team_key"))
+            .filter(  # Filter Out Off-season Demo Teams (9970-9999)
+                ~pl.col("team_key")
+                .str.extract(r"^frc(\d+)$", 1)
+                .cast(pl.Int32)
+                .is_between(9970, 9999)
+            )
         )
 
         ranking_info_df = (
@@ -490,6 +539,48 @@ class TBAService:
             .drop("record", "current_level_record")
             .with_columns(pl.lit(event_key).alias("event_key"))
             .select("event_key", "name", pl.all().exclude("event_key", "name"))
+            .with_columns(  # Filter Out Off-season Demo Teams (9970-9999)
+                [
+                    pl.col("picks")
+                    .list.eval(
+                        pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
+                    )
+                    .list.eval(
+                        pl.when(pl.element().is_between(9970, 9999))
+                        .then(None)
+                        .otherwise(pl.element())
+                    )
+                    .list.drop_nulls()
+                    .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
+                    .alias("picks"),
+                    pl.col("declines")
+                    .list.eval(
+                        pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
+                    )
+                    .list.eval(
+                        pl.when(pl.element().is_between(9970, 9999))
+                        .then(None)
+                        .otherwise(pl.element())
+                    )
+                    .list.drop_nulls()
+                    .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
+                    .alias("declines"),
+                ]
+            )
+            .filter(
+                ~pl.col("backup_in")
+                .str.extract(r"^frc(\d+)$", 1)
+                .cast(pl.Int32)
+                .is_between(9970, 9999, closed="both")
+                | pl.col("backup_in").is_null()
+            )
+            .filter(
+                ~pl.col("backup_out")
+                .str.extract(r"^frc(\d+)$", 1)
+                .cast(pl.Int32)
+                .is_between(9970, 9999, closed="both")
+                | pl.col("backup_out").is_null()
+            )
         )
 
         TypeAdapter(list[Alliance]).validate_python(alliances_df.to_dicts())
