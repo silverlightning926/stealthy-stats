@@ -325,7 +325,7 @@ class TBAService:
             pl.all().exclude("match_key", "alliance_color"),
         )
 
-        matches_df = matches_df.drop(["alliances", "score_breakdown"])
+        matches_df = matches_df.drop("alliances", "score_breakdown")
 
         TypeAdapter(list[Match]).validate_python(matches_df.to_dicts())
         TypeAdapter(list[MatchAlliance]).validate_python(match_alliances_df.to_dicts())
@@ -487,9 +487,9 @@ class TBAService:
                 .struct.field("ties")
                 .alias("current_level_ties"),
             )
-            .drop(["record", "current_level_record"])
+            .drop("record", "current_level_record")
             .with_columns(pl.lit(event_key).alias("event_key"))
-            .select("event_key", "name", pl.all().exclude(["event_key", "name"]))
+            .select("event_key", "name", pl.all().exclude("event_key", "name"))
         )
 
         TypeAdapter(list[Alliance]).validate_python(alliances_df.to_dicts())
