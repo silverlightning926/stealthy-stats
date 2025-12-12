@@ -13,6 +13,7 @@ from tenacity import (
 )
 
 from app.models.tba import (
+    Alliance,
     District,
     Event,
     EventRankingInfo,
@@ -411,6 +412,71 @@ class TBAService:
 
         data, etag = response
 
-        # TODO: Finish TBA Service get_alliance Function
+        alliances_df = (
+            pl.from_dicts(
+                data,
+                schema={
+                    "name": pl.String,
+                    "picks": pl.List(pl.String),
+                    "declines": pl.List(pl.String),
+                    "backup": pl.Struct(
+                        {
+                            "in": pl.String,
+                            "out": pl.String,
+                        }
+                    ),
+                    "status": pl.Struct(
+                        {
+                            "playoff_average": pl.Float64,
+                            "playoff_type": pl.Int32,
+                            "status": pl.String,
+                            "level": pl.String,
+                            "record": pl.Struct(
+                                {
+                                    "wins": pl.Int32,
+                                    "losses": pl.Int32,
+                                    "ties": pl.Int32,
+                                }
+                            ),
+                            "current_level_record": pl.Struct(
+                                {
+                                    "wins": pl.Int32,
+                                    "losses": pl.Int32,
+                                    "ties": pl.Int32,
+                                }
+                            ),
+                            "advanced_to_round_robin_finals": pl.Boolean,
+                            "double_elim_round": pl.String,
+                            "round_robin_rank": pl.Int32,
+                        }
+                    ),
+                },
+            )
+            .with_columns(
+                pl.col("backup").struct.field("in").alias("backup_in"),
+                pl.col("backup").struct.field("out").alias("backup_out"),
+            )
+            .drop("backup")
+            .unnest("status")
+            .with_columns(
+                pl.col("record").struct.field("wins").alias("wins"),
+                pl.col("record").struct.field("losses").alias("losses"),
+                pl.col("record").struct.field("ties").alias("ties"),
+                pl.col("current_level_record")
+                .struct.field("wins")
+                .alias("current_level_wins"),
+                pl.col("current_level_record")
+                .struct.field("losses")
+                .alias("current_level_losses"),
+                pl.col("current_level_record")
+                .struct.field("ties")
+                .alias("current_level_ties"),
+            )
+            .drop(["record", "current_level_record"])
+            .with_columns(pl.lit(event_key).alias("event_key"))
+            .select("event_key", "name", pl.all().exclude(["event_key", "name"]))
+        )
 
-        pass
+        TypeAdapter(list[Alliance]).validate_python(alliances_df.to_dicts())
+
+        return (alliances_df, etag)

@@ -129,7 +129,7 @@ class Alliance(SQLModel, table=True):
 
     event: "Event" = Relationship(back_populates="alliances")
 
-    team_backup_in: "Team | None" = Relationship(
+    team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",
         sa_relationship_kwargs={
             "foreign_keys": "[Alliance.backup_in]",
@@ -137,7 +137,7 @@ class Alliance(SQLModel, table=True):
         },
     )
 
-    team_backup_out: "Team | None" = Relationship(
+    team_backup_out: "Team" = Relationship(
         back_populates="alliances_backup_out",
         sa_relationship_kwargs={
             "foreign_keys": "[Alliance.backup_out]",

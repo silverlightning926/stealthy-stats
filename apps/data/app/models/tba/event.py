@@ -169,9 +169,9 @@ class Event(SQLModel, table=True):
         description="Event keys for divisions at this event (for championship events).",
     )
 
-    district: "District | None" = Relationship(back_populates="events")
+    district: "District" = Relationship(back_populates="events")
 
-    parent_event: "Event | None" = Relationship(
+    parent_event: "Event" = Relationship(
         back_populates="division_events",
         sa_relationship_kwargs={
             "remote_side": "[Event.key]",
@@ -188,5 +188,5 @@ class Event(SQLModel, table=True):
 
     matches: list["Match"] = Relationship(back_populates="event")
     rankings: list["Ranking"] = Relationship(back_populates="event")
-    ranking_info: "EventRankingInfo | None" = Relationship(back_populates="event")
+    ranking_info: "EventRankingInfo" = Relationship(back_populates="event")
     alliances: list["Alliance"] = Relationship(back_populates="event")
