@@ -50,7 +50,7 @@ def sync_rankings(active_only: bool = False):
         ranking_infos_df = pl.concat(ranking_infos)
         db.upsert(
             ranking_infos_df,
-            table_name="event_ranking_infoa",
+            table_name="event_ranking_info",
             conflict_key="event_key",
         )
 
