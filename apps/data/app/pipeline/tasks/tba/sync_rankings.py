@@ -50,8 +50,8 @@ def sync_rankings(active_only: bool = False):
         ranking_infos_df = pl.concat(ranking_infos)
         db.upsert(
             ranking_infos_df,
-            table_name="ranking_infos",
-            conflict_key="key",
+            table_name="event_ranking_infoa",
+            conflict_key="event_key",
         )
 
     if rankings:
@@ -59,7 +59,7 @@ def sync_rankings(active_only: bool = False):
         db.upsert(
             rankings_df,
             table_name="rankings",
-            conflict_key="key",
+            conflict_key=["event_key", "team_key"],
         )
 
     if etags:

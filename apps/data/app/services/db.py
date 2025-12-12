@@ -55,8 +55,12 @@ class DBService:
         finally:
             session.close()
 
-    # TODO: Evaluate Tenacity Retrying On DB Service Upsert Function
-    def upsert(self, df: pl.DataFrame, table_name: str, conflict_key: str):
+    def upsert(
+        self,
+        df: pl.DataFrame,
+        table_name: str,
+        conflict_key: str | list[str] | None = None,
+    ):
         with self.get_session() as session:
             records = df.to_dicts()
 
@@ -68,10 +72,19 @@ class DBService:
 
             stmt = insert(table).values(records)
 
-            update_cols = {c: stmt.excluded[c] for c in df.columns if c != conflict_key}
+            if conflict_key is None:
+                conflict_keys = [col.name for col in table.primary_key.columns]
+            else:
+                conflict_keys = (
+                    [conflict_key] if isinstance(conflict_key, str) else conflict_key
+                )
+
+            update_cols = {
+                c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
+            }
 
             upsert_stmt = stmt.on_conflict_do_update(
-                index_elements=[conflict_key],
+                index_elements=conflict_keys,
                 set_=update_cols,
             )
 

@@ -49,7 +49,7 @@ def sync_alliances(active_only: bool = False):
         db.upsert(
             alliances_df,
             table_name="alliances",
-            conflict_key="key",
+            conflict_key=["event_key", "name"],
         )
 
     if etags:
