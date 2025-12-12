@@ -10,45 +10,47 @@ if TYPE_CHECKING:
 
 
 class Match(SQLModel, table=True):
-    __tablename__ = "matches"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "matches"  # type: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
-        description="TBA match key with the format yyyy[EVENT_CODE]_[COMP_LEVEL]m[MATCH_NUMBER], where yyyy is the year, and EVENT_CODE is the event code of the event, COMP_LEVEL is (qm, ef, qf, sf, f), and MATCH_NUMBER is the match number in the competition level.",
+        description="TBA match key: yyyy[EVENT_CODE]_[COMP_LEVEL]m[MATCH_NUMBER], e.g. '2024pnw_qm1'.",
         regex=r"^\d{4}[a-z0-9]+_(qm|ef|qf|sf|f)\d*m\d+$",
     )
 
+    event_key: str = Field(
+        foreign_key="events.key",
+        index=True,
+        description="Event key where this match was played.",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+
     comp_level: str = Field(
-        description="The competition level the match was played at.",
+        index=True,
+        description="Competition level: qm (quals), ef/qf/sf/f (playoffs).",
         regex=r"^(qm|ef|qf|sf|f)$",
     )
 
     set_number: int = Field(
-        description="The set number in a series of matches where more than one match is required in the match series.",
+        description="Set number in playoff series (1 for single-match rounds).",
         ge=1,
     )
 
     match_number: int = Field(
-        description="The match number of the match in the competition level.",
+        description="Match number within the competition level.",
         ge=1,
     )
 
     winning_alliance: str = Field(
         default="",
-        description="The color (red/blue) of the winning alliance. Will contain an empty string in the event of no winner, or a tie.",
+        description="Winning alliance color ('red', 'blue', or empty string for tie/unplayed).",
         regex=r"^(red|blue|)$",
-    )
-
-    event_key: str = Field(
-        foreign_key="events.key",
-        description="Event key of the event the match was played at.",
-        regex=r"^\d{4}[a-z0-9]+$",
     )
 
     time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="Scheduled match time, as taken from the published schedule.",
+        description="Scheduled match time from published schedule.",
     )
 
     actual_time: datetime | None = Field(
@@ -60,13 +62,13 @@ class Match(SQLModel, table=True):
     predicted_time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="TBA predicted match start time.",
+        description="TBA-predicted match start time.",
     )
 
     post_result_time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="Time when the match result was posted.",
+        description="Time when match results were posted.",
     )
 
     event: "Event" = Relationship(back_populates="matches")

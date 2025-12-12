@@ -8,11 +8,12 @@ if TYPE_CHECKING:
 
 
 class MatchAlliance(SQLModel, table=True):
-    __tablename__ = "match_alliances"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "match_alliances"  # type: ignore[reportAssignmentType]
 
     match_key: str = Field(
         foreign_key="matches.key",
         primary_key=True,
+        index=True,
         description="TBA match key this alliance belongs to.",
     )
 
@@ -23,30 +24,30 @@ class MatchAlliance(SQLModel, table=True):
     )
 
     score: int = Field(
-        description="Score for this alliance. Will be -1 for an unplayed match.",
+        description="Alliance score (-1 for unplayed matches).",
     )
 
     team_keys: list[str] = Field(
         sa_column=Column(ARRAY(String)),
-        description="TBA Team keys (eg frc254) for teams on this alliance.",
+        description="TBA team keys (e.g. 'frc254') for teams on this alliance.",
     )
 
     surrogate_team_keys: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(String)),
-        description="TBA team keys (eg frc254) of any teams playing as a surrogate.",
+        description="TBA team keys of surrogate teams.",
     )
 
     dq_team_keys: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(String)),
-        description="TBA team keys (eg frc254) of any disqualified teams.",
+        description="TBA team keys of disqualified teams.",
     )
 
     score_breakdown: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSON),
-        description="Score breakdown for auto, teleop, etc. points. Varies from year to year. May be null.",
+        description="Detailed score breakdown (auto, teleop, etc). Year-specific structure.",
     )
 
     match: "Match" = Relationship(back_populates="alliances")

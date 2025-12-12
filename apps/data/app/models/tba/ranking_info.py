@@ -7,5 +7,6 @@ class RankingInfo(SQLModel):
     )
 
     precision: int = Field(
-        description="Integer expressing the number of digits of precision in the number provided in sort_orders."
+        description="Number of digits of precision in the sort_orders values.",
+        ge=0,
     )

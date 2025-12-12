@@ -8,62 +8,78 @@ if TYPE_CHECKING:
 
 
 class Team(SQLModel, table=True):
-    __tablename__ = "teams"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "teams"  # type: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
-        description="TBA team key with the format frcXXXX with XXXX representing the team number",
+        description="TBA team key with format 'frcXXXX' where XXXX is the team number.",
         regex=r"^frc\d+$",
     )
+
     team_number: int = Field(
-        description="Official team number issued by FIRST",
+        index=True,
+        description="Official team number issued by FIRST.",
         gt=0,
     )
-    nickname: str = Field(description="Team nickname provided by FIRST")
-    name: str = Field(description="Official long name registered with FIRST")
+
+    nickname: str = Field(
+        description="Team nickname provided by FIRST.",
+    )
+
+    name: str = Field(
+        description="Official long name registered with FIRST.",
+    )
 
     school_name: str | None = Field(
         default=None,
-        description="Name of team school or affiliated group registered with FIRST",
+        description="Name of team school or affiliated group registered with FIRST.",
     )
+
     city: str | None = Field(
         default=None,
-        description="City of team derived from parsing the address registered with FIRST",
+        description="City derived from the address registered with FIRST.",
     )
+
     state_prov: str | None = Field(
         default=None,
-        description="State of team derived from parsing the address registered with FIRST",
+        description="State/province derived from the address registered with FIRST.",
     )
+
     country: str | None = Field(
         default=None,
-        description="Country of team derived from parsing the address registered with FIRST",
+        description="Country derived from the address registered with FIRST.",
     )
+
     postal_code: str | None = Field(
         default=None,
-        description="Postal code from the team address",
+        description="Postal code from the team address.",
     )
 
     website: str | None = Field(
         default=None,
-        description="Official website associated with the team",
+        description="Official website associated with the team.",
     )
 
     rookie_year: int | None = Field(
         default=None,
-        description="First year the team officially competed",
+        description="First year the team officially competed.",
         ge=1992,
     )
 
     rankings: list["Ranking"] = Relationship(back_populates="team")
+
     alliances_backup_in: list["Alliance"] = Relationship(
+        back_populates="team_backup_in",
         sa_relationship_kwargs={
             "foreign_keys": "[Alliance.backup_in]",
             "primaryjoin": "Team.key == Alliance.backup_in",
-        }
+        },
     )
+
     alliances_backup_out: list["Alliance"] = Relationship(
+        back_populates="team_backup_out",
         sa_relationship_kwargs={
             "foreign_keys": "[Alliance.backup_out]",
             "primaryjoin": "Team.key == Alliance.backup_out",
-        }
+        },
     )

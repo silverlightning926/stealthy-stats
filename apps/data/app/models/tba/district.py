@@ -7,25 +7,25 @@ if TYPE_CHECKING:
 
 
 class District(SQLModel, table=True):
-    __tablename__ = "districts"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "districts"  # type: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
-        description="Key for this district, e.g. 2016ne.",
+        description="District key with format yyyy[DISTRICT_CODE], e.g. '2016ne'.",
         regex=r"^\d{4}[a-z0-9]+$",
     )
 
     abbreviation: str = Field(
-        description="The short identifier for the district.",
+        description="Short identifier for the district (e.g. 'ne', 'pnw').",
     )
 
     display_name: str = Field(
-        description="The long name for the district.",
+        description="Full display name for the district.",
     )
 
     year: int = Field(
         index=True,
-        description="Year this district participated.",
+        description="Competition year for this district.",
         ge=1992,
     )
 

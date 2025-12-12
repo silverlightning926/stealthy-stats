@@ -9,40 +9,42 @@ if TYPE_CHECKING:
 
 
 class Ranking(SQLModel, table=True):
-    __tablename__ = "rankings"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "rankings"  # type: ignore[reportAssignmentType]
 
     event_key: str = Field(
         foreign_key="events.key",
         primary_key=True,
-        description="TBA event key this ranking belongs to.",
+        index=True,
+        description="TBA event key for this ranking.",
         regex=r"^\d{4}[a-z0-9]+$",
     )
 
     team_key: str = Field(
         foreign_key="teams.key",
         primary_key=True,
+        index=True,
         description="TBA team key for this ranking.",
         regex=r"^frc\d+$",
     )
 
     rank: int = Field(
-        description="The team's rank at the event as provided by FIRST.",
+        description="Team's rank at the event as provided by FIRST.",
         ge=1,
     )
 
     matches_played: int = Field(
-        description="Number of matches played by this team.",
+        description="Number of qualification matches played.",
         ge=0,
     )
 
     qual_average: int | None = Field(
         default=None,
-        description="The average match score during qualifications. Year specific. May be null if not relevant for a given year.",
+        description="Average qualification match score (year-specific, may be null).",
     )
 
     dq: int = Field(
         default=0,
-        description="Number of times disqualified.",
+        description="Number of disqualifications.",
         ge=0,
     )
 
@@ -64,13 +66,13 @@ class Ranking(SQLModel, table=True):
     extra_stats: list[int] | None = Field(
         default=None,
         sa_column=Column(JSON),
-        description="Additional statistics for this ranking. Year specific.",
+        description="Additional year-specific statistics (see EventRankingInfo for field definitions).",
     )
 
     sort_orders: list[float] | None = Field(
         default=None,
         sa_column=Column(JSON),
-        description="Sort order values used for ranking calculations. Year specific.",
+        description="Year-specific sort order values (see EventRankingInfo for field definitions).",
     )
 
     event: "Event" = Relationship(back_populates="rankings")
