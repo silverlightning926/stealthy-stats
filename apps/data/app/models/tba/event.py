@@ -5,6 +5,7 @@ from sqlalchemy import ARRAY, String
 from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
+    from .alliance import Alliance
     from .district import District
     from .event_ranking_info import EventRankingInfo
     from .match import Match
@@ -166,3 +167,4 @@ class Event(SQLModel, table=True):
     matches: list["Match"] = Relationship(back_populates="event")
     rankings: list["Ranking"] = Relationship(back_populates="event")
     ranking_info: Optional["EventRankingInfo"] = Relationship(back_populates="event")
+    alliances: list["Alliance"] = Relationship(back_populates="event")

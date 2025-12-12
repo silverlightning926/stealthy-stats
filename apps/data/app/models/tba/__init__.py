@@ -1,3 +1,4 @@
+from .alliance import Alliance
 from .district import District
 from .event import Event
 from .event_ranking_info import EventRankingInfo
@@ -16,4 +17,5 @@ __all__ = [
     "Ranking",
     "RankingInfo",
     "EventRankingInfo",
+    "Alliance",
 ]
