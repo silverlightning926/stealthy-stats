@@ -107,9 +107,11 @@ class TBAService:
                     "website": pl.String,
                     "rookie_year": pl.Int32,
                 },
-            ).filter(  # Filter Out Off-Season Demo Teams
+            )
+            .filter(  # Filter Out Off-Season Demo Teams
                 ~pl.col("nickname").str.contains("(?i)off-?season"),
-            ),
+            )
+            .select("key", pl.all().exclude("key")),
             etag,
         )
 
@@ -175,13 +177,18 @@ class TBAService:
             .filter(pl.col("district").is_not_null())
             .unnest("district")
             .unique()
+            .select("key", pl.all().exclude("key"))
         )
 
-        events_df = events_df.with_columns(
-            pl.col("district").struct.field("key").alias("district_key"),
-            pl.col("start_date").str.to_date(),
-            pl.col("end_date").str.to_date(),
-        ).drop("district")
+        events_df = (
+            events_df.with_columns(
+                pl.col("district").struct.field("key").alias("district_key"),
+                pl.col("start_date").str.to_date(),
+                pl.col("end_date").str.to_date(),
+            )
+            .drop("district")
+            .select("key", pl.all().exclude("key"))
+        )
 
         TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
         TypeAdapter(list[District]).validate_python(districts_df.to_dicts())
@@ -205,48 +212,52 @@ class TBAService:
 
         data, etag = response
 
-        matches_df = pl.from_dicts(
-            data,
-            schema={
-                "key": pl.String,
-                "comp_level": pl.String,
-                "set_number": pl.Int32,
-                "match_number": pl.Int32,
-                "alliances": pl.Struct(
-                    {
-                        "red": pl.Struct(
-                            {
-                                "score": pl.Int32,
-                                "team_keys": pl.List(pl.String),
-                                "surrogate_team_keys": pl.List(pl.String),
-                                "dq_team_keys": pl.List(pl.String),
-                            }
-                        ),
-                        "blue": pl.Struct(
-                            {
-                                "score": pl.Int32,
-                                "team_keys": pl.List(pl.String),
-                                "surrogate_team_keys": pl.List(pl.String),
-                                "dq_team_keys": pl.List(pl.String),
-                            }
-                        ),
-                    }
-                ),
-                "winning_alliance": pl.String,
-                "event_key": pl.String,
-                "time": pl.Int64,
-                "actual_time": pl.Int64,
-                "predicted_time": pl.Int64,
-                "post_result_time": pl.Int64,
-                "score_breakdown": pl.Object,
-            },
-        ).with_columns(
-            [
-                pl.from_epoch("time", time_unit="s"),
-                pl.from_epoch("actual_time", time_unit="s"),
-                pl.from_epoch("predicted_time", time_unit="s"),
-                pl.from_epoch("post_result_time", time_unit="s"),
-            ]
+        matches_df = (
+            pl.from_dicts(
+                data,
+                schema={
+                    "key": pl.String,
+                    "comp_level": pl.String,
+                    "set_number": pl.Int32,
+                    "match_number": pl.Int32,
+                    "alliances": pl.Struct(
+                        {
+                            "red": pl.Struct(
+                                {
+                                    "score": pl.Int32,
+                                    "team_keys": pl.List(pl.String),
+                                    "surrogate_team_keys": pl.List(pl.String),
+                                    "dq_team_keys": pl.List(pl.String),
+                                }
+                            ),
+                            "blue": pl.Struct(
+                                {
+                                    "score": pl.Int32,
+                                    "team_keys": pl.List(pl.String),
+                                    "surrogate_team_keys": pl.List(pl.String),
+                                    "dq_team_keys": pl.List(pl.String),
+                                }
+                            ),
+                        }
+                    ),
+                    "winning_alliance": pl.String,
+                    "event_key": pl.String,
+                    "time": pl.Int64,
+                    "actual_time": pl.Int64,
+                    "predicted_time": pl.Int64,
+                    "post_result_time": pl.Int64,
+                    "score_breakdown": pl.Object,
+                },
+            )
+            .with_columns(
+                [
+                    pl.from_epoch("time", time_unit="s"),
+                    pl.from_epoch("actual_time", time_unit="s"),
+                    pl.from_epoch("predicted_time", time_unit="s"),
+                    pl.from_epoch("post_result_time", time_unit="s"),
+                ]
+            )
+            .select("key", pl.all().exclude("key"))
         )
 
         match_alliances_df = pl.concat(
@@ -308,6 +319,10 @@ class TBAService:
                     ]
                 ),
             ]
+        ).select(
+            "match_key",
+            "alliance_color",
+            pl.all().exclude("match_key", "alliance_color"),
         )
 
         matches_df = matches_df.drop(["alliances", "score_breakdown"])
@@ -356,7 +371,7 @@ class TBAService:
             )
             .unnest("record")
             .with_columns(pl.lit(event_key).alias("event_key"))
-            .select("event_key", pl.all().exclude("event_key"))
+            .select("event_key", "team_key", pl.all().exclude("event_key", "team_key"))
         )
 
         ranking_info_df = (
