@@ -29,6 +29,7 @@ class _TBAEndpoint(StrEnum):
     DISTRICTS = "/districts/{year}"
     MATCHES = "/event/{event_key}/matches"
     RANKINGS = "/event/{event_key}/rankings"
+    ALLIANCES = "/event/{event_key}/alliances"
 
     def build(self, **kwargs: str) -> str:
         return self.value.format(**kwargs)
@@ -396,3 +397,20 @@ class TBAService:
             ranking_info_df,
             etag,
         )
+
+    def get_alliances(
+        self, event_key: str, etag: str | None = None
+    ) -> tuple[pl.DataFrame, str | None] | None:
+        response = self._get(
+            endpoint=_TBAEndpoint.ALLIANCES.build(event_key=event_key),
+            etag=etag,
+        )
+
+        if response is None:
+            return None
+
+        data, etag = response
+
+        # TODO: Finish TBA Service get_alliance Function
+
+        pass

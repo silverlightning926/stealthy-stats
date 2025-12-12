@@ -1,3 +1,4 @@
+from .sync_alliances import sync_alliances
 from .sync_events import sync_events
 from .sync_matches import sync_matches
 from .sync_rankings import sync_rankings
@@ -8,4 +9,5 @@ __all__ = [
     "sync_events",
     "sync_matches",
     "sync_rankings",
+    "sync_alliances",
 ]

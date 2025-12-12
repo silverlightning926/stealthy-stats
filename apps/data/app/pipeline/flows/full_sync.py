@@ -1,6 +1,12 @@
 from prefect import flow
 
-from app.pipeline.tasks.tba import sync_events, sync_matches, sync_rankings, sync_teams
+from app.pipeline.tasks.tba import (
+    sync_alliances,
+    sync_events,
+    sync_matches,
+    sync_rankings,
+    sync_teams,
+)
 
 
 @flow(
@@ -14,3 +20,4 @@ def full_sync():
     sync_events()
     sync_matches(active_only=False)
     sync_rankings(active_only=False)
+    sync_alliances(active_only=False)

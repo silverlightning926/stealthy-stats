@@ -11,9 +11,12 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models import ETag  # noqa: F401
 from app.models.tba import (  # noqa: F401
+    Alliance,
     District,
     Event,
     EventRankingInfo,
+    Match,
+    MatchAlliance,
     Ranking,
     RankingInfo,
     Team,

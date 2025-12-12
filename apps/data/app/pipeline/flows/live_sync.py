@@ -1,6 +1,6 @@
 from prefect import flow
 
-from app.pipeline.tasks.tba import sync_matches, sync_rankings
+from app.pipeline.tasks.tba import sync_alliances, sync_matches, sync_rankings
 from app.services import DBService
 
 
@@ -18,3 +18,4 @@ def live_sync():
 
     sync_matches(active_only=True)
     sync_rankings(active_only=True)
+    sync_alliances(active_only=True)
