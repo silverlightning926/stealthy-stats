@@ -18,6 +18,7 @@ from app.models.tba import (
     AllianceTeam,
     Event,
     EventDistrict,
+    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
@@ -30,6 +31,7 @@ from app.models.tba import (
 class _TBAEndpoint(StrEnum):
     TEAMS = "/teams/{page}"
     EVENTS = "/events/{year}"
+    EVENT_TEAMS = "/event/{event_key}/teams/keys"
     DISTRICTS = "/districts/{year}"
     MATCHES = "/event/{event_key}/matches"
     RANKINGS = "/event/{event_key}/rankings"
@@ -280,6 +282,51 @@ class TBAService:
 
         except Exception as e:
             self.logger.error(f"Error processing events data for year {year}: {e}")
+            raise
+
+    def get_event_teams(
+        self, event_key: str, etag: str | None = None
+    ) -> tuple[pl.DataFrame, str | None] | None:
+        self.logger.info(f"Fetching teams for event: {event_key}")
+
+        response = self._get(
+            endpoint=_TBAEndpoint.EVENT_TEAMS.build(event_key=event_key),
+            etag=etag,
+        )
+
+        if response is None:
+            self.logger.debug(
+                f"Teams for event {event_key} returned 304 (not modified)"
+            )
+            return None
+
+        data, etag = response
+
+        try:
+            event_teams_df = (
+                pl.DataFrame({"team_key": data})
+                .filter(
+                    ~pl.col("team_key")
+                    .str.extract(r"^frc(\d+)$", 1)
+                    .cast(pl.Int32)
+                    .is_between(9970, 9999)
+                )
+                .with_columns(pl.lit(event_key).alias("event_key"))
+                .select("event_key", "team_key")
+            )
+
+            TypeAdapter(list[EventTeam]).validate_python(event_teams_df.to_dicts())
+
+            self.logger.info(
+                f"Processed {len(event_teams_df)} teams for event {event_key}"
+            )
+
+            return (event_teams_df, etag)
+
+        except Exception as e:
+            self.logger.error(
+                f"Error processing event teams data for event {event_key}: {e}"
+            )
             raise
 
     def get_matches(
