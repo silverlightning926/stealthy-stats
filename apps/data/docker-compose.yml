@@ -1,0 +1,68 @@
+services:
+  prefect-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    volumes:
+      - prefect-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data-network
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+    networks:
+      - data-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://localhost:4200/api/health', timeout=1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  data-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_LOGGING_EXTRA_LOGGERS: app.services
+      DATABASE_URL: ${DATABASE_URL}
+      TBA_API_KEY: ${TBA_API_KEY}
+    env_file:
+      - .env
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    networks:
+      - data-network
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app:ro
+
+volumes:
+  prefect-db:
+
+networks:
+  data-network:
