@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
-      PREFECT_LOGGING_EXTRA_LOGGERS: app.services
+      PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
       DATABASE_URL: ${DATABASE_URL}
       TBA_API_KEY: ${TBA_API_KEY}
     env_file:
