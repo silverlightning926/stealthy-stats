@@ -18,6 +18,7 @@ from app.models.tba import (
     AllianceTeam,
     Event,
     EventDistrict,
+    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
@@ -115,31 +116,37 @@ class TBAService:
         try:
             TypeAdapter(list[Team]).validate_python(data)
 
-            df = (
-                pl.from_dicts(
-                    data,
-                    schema={
-                        "key": pl.String,
-                        "team_number": pl.Int32,
-                        "nickname": pl.String,
-                        "name": pl.String,
-                        "school_name": pl.String,
-                        "city": pl.String,
-                        "state_prov": pl.String,
-                        "country": pl.String,
-                        "postal_code": pl.String,
-                        "website": pl.String,
-                        "rookie_year": pl.Int32,
-                    },
-                )
-                .filter(
-                    ~pl.col("team_number").is_between(9970, 9999),
-                )
-                .select("key", pl.all().exclude("key"))
+            teams_df = pl.from_dicts(
+                data,
+                schema={
+                    "key": pl.String,
+                    "team_number": pl.Int32,
+                    "nickname": pl.String,
+                    "name": pl.String,
+                    "school_name": pl.String,
+                    "city": pl.String,
+                    "state_prov": pl.String,
+                    "country": pl.String,
+                    "postal_code": pl.String,
+                    "website": pl.String,
+                    "rookie_year": pl.Int32,
+                },
+            ).select(
+                "key",
+                "team_number",
+                "nickname",
+                "name",
+                "school_name",
+                "city",
+                "state_prov",
+                "country",
+                "postal_code",
+                "website",
+                "rookie_year",
             )
 
-            self.logger.info(f"Processed {len(df)} teams from page {page}")
-            return (df, etag)
+            self.logger.info(f"Processed {len(teams_df)} teams from page {page}")
+            return (teams_df, etag)
 
         except Exception as e:
             self.logger.error(f"Error processing teams data from page {page}: {e}")
@@ -204,12 +211,17 @@ class TBAService:
                 },
             ).filter(~pl.col("event_type").is_in([-1, 7, 99, 100]))
 
-            districts_df = (
+            event_districts_df = (
                 events_df.select("district")
                 .filter(pl.col("district").is_not_null())
                 .unnest("district")
                 .unique()
-                .select("key", pl.all().exclude("key"))
+                .select(
+                    "key",
+                    "year",
+                    "abbreviation",
+                    "display_name",
+                )
             )
 
             events_df = (
@@ -219,17 +231,49 @@ class TBAService:
                     pl.col("end_date").str.to_date(),
                 )
                 .drop("district")
-                .select("key", pl.all().exclude("key"))
+                .select(
+                    "key",
+                    "district_key",
+                    "parent_event_key",
+                    "name",
+                    "event_code",
+                    "event_type",
+                    "event_type_string",
+                    "year",
+                    "start_date",
+                    "end_date",
+                    "week",
+                    "short_name",
+                    "city",
+                    "state_prov",
+                    "country",
+                    "postal_code",
+                    "address",
+                    "location_name",
+                    "timezone",
+                    "lat",
+                    "lng",
+                    "website",
+                    "gmaps_place_id",
+                    "gmaps_url",
+                    "first_event_id",
+                    "first_event_code",
+                    "playoff_type",
+                    "playoff_type_string",
+                    "division_keys",
+                )
             )
 
             TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
-            TypeAdapter(list[District]).validate_python(districts_df.to_dicts())
-
-            self.logger.info(
-                f"Processed {len(events_df)} events and {len(districts_df)} districts for year {year}"
+            TypeAdapter(list[EventDistrict]).validate_python(
+                event_districts_df.to_dicts()
             )
 
-            return (events_df, districts_df, etag)
+            self.logger.info(
+                f"Processed {len(events_df)} events and {len(event_districts_df)} districts for year {year}"
+            )
+
+            return (events_df, event_districts_df, etag)
 
         except Exception as e:
             self.logger.error(f"Error processing events data for year {year}: {e}")
@@ -237,7 +281,7 @@ class TBAService:
 
     def get_matches(
         self, event_key: str, etag: str | None = None
-    ) -> tuple[pl.DataFrame, pl.DataFrame, str | None] | None:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, str | None] | None:
         self.logger.info(f"Fetching matches for event: {event_key}")
 
         response = self._get(
@@ -302,112 +346,110 @@ class TBAService:
                 .select("key", pl.all().exclude("key"))
             )
 
-            match_alliances_df = (
-                pl.concat(
+            alliance_with_teams_df = pl.concat(
+                [
+                    matches_df.select(
+                        [
+                            pl.col("key").alias("match_key"),
+                            pl.col("event_key"),
+                            pl.lit("red").alias("alliance_color"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("score")
+                            .alias("score"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("team_keys")
+                            .alias("team_keys"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("surrogate_team_keys")
+                            .alias("surrogate_team_keys"),
+                            pl.col("alliances")
+                            .struct.field("red")
+                            .struct.field("dq_team_keys")
+                            .alias("dq_team_keys"),
+                            pl.col("score_breakdown")
+                            .map_elements(
+                                lambda x: x.get("red") if x else None,
+                                return_dtype=pl.Object,
+                            )
+                            .alias("score_breakdown"),
+                        ]
+                    ),
+                    matches_df.select(
+                        [
+                            pl.col("key").alias("match_key"),
+                            pl.col("event_key"),
+                            pl.lit("blue").alias("alliance_color"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("score")
+                            .alias("score"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("team_keys")
+                            .alias("team_keys"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("surrogate_team_keys")
+                            .alias("surrogate_team_keys"),
+                            pl.col("alliances")
+                            .struct.field("blue")
+                            .struct.field("dq_team_keys")
+                            .alias("dq_team_keys"),
+                            pl.col("score_breakdown")
+                            .map_elements(
+                                lambda x: x.get("blue") if x else None,
+                                return_dtype=pl.Object,
+                            )
+                            .alias("score_breakdown"),
+                        ]
+                    ),
+                ]
+            )
+
+            match_alliance_teams_df = (
+                alliance_with_teams_df.select(
                     [
-                        matches_df.select(
-                            [
-                                pl.col("key").alias("match_key"),
-                                pl.lit("red").alias("alliance_color"),
-                                pl.col("alliances")
-                                .struct.field("red")
-                                .struct.field("score")
-                                .alias("score"),
-                                pl.col("alliances")
-                                .struct.field("red")
-                                .struct.field("team_keys")
-                                .alias("team_keys"),
-                                pl.col("alliances")
-                                .struct.field("red")
-                                .struct.field("surrogate_team_keys")
-                                .alias("surrogate_team_keys"),
-                                pl.col("alliances")
-                                .struct.field("red")
-                                .struct.field("dq_team_keys")
-                                .alias("dq_team_keys"),
-                                pl.col("score_breakdown")
-                                .map_elements(
-                                    lambda x: x.get("red") if x else None,
-                                    return_dtype=pl.Object,
-                                )
-                                .alias("score_breakdown"),
-                            ]
-                        ),
-                        matches_df.select(
-                            [
-                                pl.col("key").alias("match_key"),
-                                pl.lit("blue").alias("alliance_color"),
-                                pl.col("alliances")
-                                .struct.field("blue")
-                                .struct.field("score")
-                                .alias("score"),
-                                pl.col("alliances")
-                                .struct.field("blue")
-                                .struct.field("team_keys")
-                                .alias("team_keys"),
-                                pl.col("alliances")
-                                .struct.field("blue")
-                                .struct.field("surrogate_team_keys")
-                                .alias("surrogate_team_keys"),
-                                pl.col("alliances")
-                                .struct.field("blue")
-                                .struct.field("dq_team_keys")
-                                .alias("dq_team_keys"),
-                                pl.col("score_breakdown")
-                                .map_elements(
-                                    lambda x: x.get("blue") if x else None,
-                                    return_dtype=pl.Object,
-                                )
-                                .alias("score_breakdown"),
-                            ]
-                        ),
+                        "match_key",
+                        "alliance_color",
+                        "event_key",
+                        "team_keys",
+                        "surrogate_team_keys",
+                        "dq_team_keys",
                     ]
                 )
+                .explode("team_keys")
+                .rename({"team_keys": "team_key"})
+                .filter(pl.col("team_key").is_not_null())
                 .with_columns(
                     [
-                        pl.col("team_keys")
-                        .list.eval(
-                            pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
-                        )
-                        .list.eval(
-                            pl.when(pl.element().is_between(9970, 9999))
-                            .then(None)
-                            .otherwise(pl.element())
-                        )
-                        .list.drop_nulls()
-                        .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
-                        .alias("team_keys"),
-                        pl.col("surrogate_team_keys")
-                        .list.eval(
-                            pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
-                        )
-                        .list.eval(
-                            pl.when(pl.element().is_between(9970, 9999))
-                            .then(None)
-                            .otherwise(pl.element())
-                        )
-                        .list.drop_nulls()
-                        .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
-                        .alias("surrogate_team_keys"),
-                        pl.col("dq_team_keys")
-                        .list.eval(
-                            pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
-                        )
-                        .list.eval(
-                            pl.when(pl.element().is_between(9970, 9999))
-                            .then(None)
-                            .otherwise(pl.element())
-                        )
-                        .list.drop_nulls()
-                        .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
-                        .alias("dq_team_keys"),
+                        pl.col("team_key")
+                        .is_in(pl.col("surrogate_team_keys"))
+                        .alias("is_surrogate"),
+                        pl.col("team_key").is_in(pl.col("dq_team_keys")).alias("is_dq"),
                     ]
                 )
                 .select(
+                    [
+                        "match_key",
+                        "alliance_color",
+                        "team_key",
+                        "event_key",
+                        "is_surrogate",
+                        "is_dq",
+                    ]
+                )
+            )
+
+            match_alliances_df = alliance_with_teams_df.select(
+                [
                     "match_key",
                     "alliance_color",
-                    pl.all().exclude("match_key", "alliance_color"),
-                )
+                    "score",
+                    "score_breakdown",
+                ]
             )
 
             matches_df = matches_df.drop("alliances", "score_breakdown")
@@ -416,12 +458,15 @@ class TBAService:
             TypeAdapter(list[MatchAlliance]).validate_python(
                 match_alliances_df.to_dicts()
             )
+            TypeAdapter(list[MatchAllianceTeam]).validate_python(
+                match_alliance_teams_df.to_dicts()
+            )
 
             self.logger.info(
                 f"Processed {len(matches_df)} matches for event {event_key}"
             )
 
-            return (matches_df, match_alliances_df, etag)
+            return (matches_df, match_alliances_df, match_alliance_teams_df, etag)
 
         except Exception as e:
             self.logger.error(
@@ -455,7 +500,7 @@ class TBAService:
                         "team_key": pl.String,
                         "rank": pl.Int32,
                         "matches_played": pl.Int32,
-                        "qual_average": pl.Int32,
+                        "qual_average": pl.Float64,
                         "dq": pl.Int32,
                         "record": pl.Struct(
                             {
@@ -471,13 +516,17 @@ class TBAService:
                 .unnest("record")
                 .with_columns(pl.lit(event_key).alias("event_key"))
                 .select(
-                    "event_key", "team_key", pl.all().exclude("event_key", "team_key")
-                )
-                .filter(
-                    ~pl.col("team_key")
-                    .str.extract(r"^frc(\d+)$", 1)
-                    .cast(pl.Int32)
-                    .is_between(9970, 9999)
+                    "event_key",
+                    "team_key",
+                    "rank",
+                    "matches_played",
+                    "wins",
+                    "losses",
+                    "ties",
+                    "dq",
+                    "qual_average",
+                    "extra_stats",
+                    "sort_orders",
                 )
             )
 
@@ -485,8 +534,8 @@ class TBAService:
                 pl.from_dicts(
                     [
                         {
-                            "extra_stats_info": data.get("extra_stats_info", []),
-                            "sort_order_info": data.get("sort_order_info", []),
+                            "extra_stats_info": data.get("extra_stats_info"),
+                            "sort_order_info": data.get("sort_order_info"),
                         }
                     ],
                     schema={
@@ -509,11 +558,11 @@ class TBAService:
                     },
                 )
                 .with_columns(pl.lit(event_key).alias("event_key"))
-                .select("event_key", pl.all().exclude("event_key"))
+                .select("event_key", "extra_stats_info", "sort_order_info")
             )
 
             TypeAdapter(list[Ranking]).validate_python(rankings_df.to_dicts())
-            TypeAdapter(list[EventRankingInfo]).validate_python(
+            TypeAdapter(list[RankingEventInfo]).validate_python(
                 ranking_info_df.to_dicts()
             )
 
@@ -531,7 +580,7 @@ class TBAService:
 
     def get_alliances(
         self, event_key: str, etag: str | None = None
-    ) -> tuple[pl.DataFrame, str | None] | None:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, str | None] | None:
         self.logger.info(f"Fetching alliances for event: {event_key}")
 
         response = self._get(
@@ -548,13 +597,12 @@ class TBAService:
         data, etag = response
 
         try:
-            alliances_df = (
+            alliances_raw_df = (
                 pl.from_dicts(
                     data,
                     schema={
                         "name": pl.String,
                         "picks": pl.List(pl.String),
-                        "declines": pl.List(pl.String),
                         "backup": pl.Struct(
                             {
                                 "in": pl.String,
@@ -591,6 +639,7 @@ class TBAService:
                 .with_columns(
                     pl.col("backup").struct.field("in").alias("backup_in"),
                     pl.col("backup").struct.field("out").alias("backup_out"),
+                    pl.lit(event_key).alias("event_key"),
                 )
                 .drop("backup")
                 .unnest("status")
@@ -609,59 +658,56 @@ class TBAService:
                     .alias("current_level_ties"),
                 )
                 .drop("record", "current_level_record")
-                .with_columns(pl.lit(event_key).alias("event_key"))
-                .select("event_key", "name", pl.all().exclude("event_key", "name"))
+            )
+
+            alliance_teams_df = (
+                alliances_raw_df.select(
+                    "event_key",
+                    pl.col("name").alias("alliance_name"),
+                    "picks",
+                )
                 .with_columns(
-                    [
-                        pl.col("picks")
-                        .list.eval(
-                            pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
-                        )
-                        .list.eval(
-                            pl.when(pl.element().is_between(9970, 9999))
-                            .then(None)
-                            .otherwise(pl.element())
-                        )
-                        .list.drop_nulls()
-                        .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
-                        .alias("picks"),
-                        pl.col("declines")
-                        .list.eval(
-                            pl.element().str.extract(r"^frc(\d+)$", 1).cast(pl.Int32)
-                        )
-                        .list.eval(
-                            pl.when(pl.element().is_between(9970, 9999))
-                            .then(None)
-                            .otherwise(pl.element())
-                        )
-                        .list.drop_nulls()
-                        .list.eval(pl.lit("frc") + pl.element().cast(pl.String))
-                        .alias("declines"),
-                    ]
+                    pl.col("picks")
+                    .list.eval(pl.int_range(1, pl.len() + 1))
+                    .alias("pick_order")
                 )
-                .filter(
-                    ~pl.col("backup_in")
-                    .str.extract(r"^frc(\d+)$", 1)
-                    .cast(pl.Int32)
-                    .is_between(9970, 9999, closed="both")
-                    | pl.col("backup_in").is_null()
-                )
-                .filter(
-                    ~pl.col("backup_out")
-                    .str.extract(r"^frc(\d+)$", 1)
-                    .cast(pl.Int32)
-                    .is_between(9970, 9999, closed="both")
-                    | pl.col("backup_out").is_null()
-                )
+                .explode("picks", "pick_order")
+                .filter(pl.col("picks").is_not_null())
+                .with_columns(pl.col("pick_order").cast(pl.Int32))
+                .rename({"picks": "team_key"})
+                .select("event_key", "alliance_name", "team_key", "pick_order")
+            )
+
+            alliances_df = alliances_raw_df.select(
+                "event_key",
+                "name",
+                "backup_in",
+                "backup_out",
+                "status",
+                "level",
+                "wins",
+                "losses",
+                "ties",
+                "current_level_wins",
+                "current_level_losses",
+                "current_level_ties",
+                "playoff_type",
+                "playoff_average",
+                "double_elim_round",
+                "round_robin_rank",
+                "advanced_to_round_robin_finals",
             )
 
             TypeAdapter(list[Alliance]).validate_python(alliances_df.to_dicts())
+            TypeAdapter(list[AllianceTeam]).validate_python(
+                alliance_teams_df.to_dicts()
+            )
 
             self.logger.info(
                 f"Processed {len(alliances_df)} alliances for event {event_key}"
             )
 
-            return (alliances_df, etag)
+            return (alliances_df, alliance_teams_df, etag)
 
         except Exception as e:
             self.logger.error(

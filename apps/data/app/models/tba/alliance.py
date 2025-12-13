@@ -39,10 +39,10 @@ class AllianceTeam(SQLModel, table=True):
         regex=r"^frc\d+$",
     )
 
-    pick_order: int | None = Field(
+    pick_order: int = Field(
         default=None,
         ge=1,
-        description="Pick order (1=captain, 2=first pick). Null if declined.",
+        description="Pick order (1=captain, 2=first pick).",
     )
 
     alliance: "Alliance" = Relationship(
