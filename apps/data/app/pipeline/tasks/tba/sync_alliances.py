@@ -11,7 +11,7 @@ from app.services.tba import _TBAEndpoint
 
 @task(
     name="Sync Alliances",
-    description="Sync FRC alliances from The Blue Alliance",
+    description="Sync FRC alliances and alliance teams from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
@@ -24,39 +24,40 @@ def sync_alliances(active_only: bool = False):
     tba = TBAService()
     db = DBService()
 
-    alliances: list[pl.DataFrame] = []
-
-    etags: list[dict[str, str]] = []
+    alliances_list: list[pl.DataFrame] = []
+    alliance_teams_list: list[pl.DataFrame] = []
+    etags_list: list[dict[str, str]] = []
 
     event_keys = db.get_event_keys(active_only=active_only)
-
     logger.info(f"Found {len(event_keys)} events to process")
 
-    for event in event_keys:
-        etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event)
+    for event_key in event_keys:
+        etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event_key)
 
         result = tba.get_alliances(
-            event_key=event,
+            event_key=event_key,
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if result is None:  # ETag Hit:
-            logger.debug(f"Cache hit for event {event}")
-            continue  # Skip to next loop iteration
+        if result is None:  # ETag cache hit
+            logger.debug(f"Cache hit for event {event_key}")
+            continue
 
-        event_alliances, etag = result
+        event_alliances_df, event_alliance_teams_df, etag = result
 
-        logger.debug(f"Retrieved {len(event_alliances)} alliances for event {event}")
-        alliances.append(event_alliances)
+        logger.debug(
+            f"Retrieved {len(event_alliances_df)} alliances and {len(event_alliance_teams_df)} alliance teams for event {event_key}"
+        )
+        alliances_list.append(event_alliances_df)
+        alliance_teams_list.append(event_alliance_teams_df)
 
         if etag:
-            etags.append({"endpoint": etag_key, "etag": etag})
+            etags_list.append({"endpoint": etag_key, "etag": etag})
 
         sleep(3.0)
 
-    if alliances:
-        alliances_df = pl.concat(alliances)
-
+    if alliances_list:
+        alliances_df = pl.concat(alliances_list)
         logger.info(f"Upserting {len(alliances_df)} alliances to database")
 
         db.upsert(
@@ -64,22 +65,32 @@ def sync_alliances(active_only: bool = False):
             table_name="alliances",
             conflict_key=["event_key", "name"],
         )
-
         logger.info("Successfully synced alliances")
     else:
         logger.info("No new alliance data to sync")
 
-    if etags:
-        TypeAdapter(list[ETag]).validate_python(etags)
+    if alliance_teams_list:
+        alliance_teams_df = pl.concat(alliance_teams_list)
+        logger.info(f"Upserting {len(alliance_teams_df)} alliance teams to database")
 
-        etags_df = pl.DataFrame(etags)
+        db.upsert(
+            alliance_teams_df,
+            table_name="alliance_teams",
+            conflict_key=["event_key", "alliance_name", "team_key"],
+        )
+        logger.info("Successfully synced alliance teams")
+    else:
+        logger.info("No new alliance team data to sync")
+
+    if etags_list:
+        TypeAdapter(list[ETag]).validate_python(etags_list)
+        etags_df = pl.DataFrame(etags_list)
 
         db.upsert(
             etags_df,
             table_name="etags",
             conflict_key="endpoint",
         )
-
-        logger.debug(f"Updated {len(etags)} ETag(s)")
+        logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
     logger.info(f"Alliances sync completed successfully for {mode}")

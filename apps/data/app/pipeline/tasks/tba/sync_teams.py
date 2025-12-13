@@ -11,22 +11,21 @@ from app.services.tba import _TBAEndpoint
 
 @task(
     name="Sync Teams",
-    description="Syncs FRC teams from The Blue Alliance",
+    description="Sync FRC teams from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
 def sync_teams():
     logger = get_run_logger()
-
     logger.info("Starting team sync from The Blue Alliance")
 
     tba = TBAService()
     db = DBService()
 
-    teams: list[pl.DataFrame] = []
-    etags: list[dict[str, str]] = []
+    teams_list: list[pl.DataFrame] = []
+    etags_list: list[dict[str, str]] = []
 
-    # Upper bound for safety - should break loop if it hits an empty page before upper bound
+    # Upper bound for safety - loop breaks when empty page is reached
     for page_num in range(0, 50):
         etag_key = _TBAEndpoint.TEAMS.build(page=str(page_num))
 
@@ -35,27 +34,26 @@ def sync_teams():
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if result is None:  # ETag Hit:
+        if result is None:  # ETag cache hit
             logger.debug(f"Cache hit for teams page {page_num}")
-            continue  # Skip to the next loop iteration
+            continue
 
-        page_teams, etag = result
+        page_teams_df, etag = result
 
-        if page_teams.is_empty():  # Reached Empty Page:
+        if page_teams_df.is_empty():  # Reached end of data
             logger.info(f"Reached end of teams data at page {page_num}")
-            break  # Break out of the loop
+            break
 
-        logger.debug(f"Retrieved {len(page_teams)} teams from page {page_num}")
-        teams.append(page_teams)
+        logger.debug(f"Retrieved {len(page_teams_df)} teams from page {page_num}")
+        teams_list.append(page_teams_df)
 
         if etag:
-            etags.append({"endpoint": etag_key, "etag": etag})
+            etags_list.append({"endpoint": etag_key, "etag": etag})
 
         sleep(1.5)
 
-    if teams:
-        teams_df = pl.concat(teams)
-
+    if teams_list:
+        teams_df = pl.concat(teams_list)
         logger.info(f"Upserting {len(teams_df)} teams to database")
 
         db.upsert(
@@ -63,22 +61,19 @@ def sync_teams():
             table_name="teams",
             conflict_key="key",
         )
-
         logger.info("Successfully synced teams")
     else:
         logger.info("No new team data to sync")
 
-    if etags:
-        TypeAdapter(list[ETag]).validate_python(etags)
-
-        etags_df = pl.DataFrame(etags)
+    if etags_list:
+        TypeAdapter(list[ETag]).validate_python(etags_list)
+        etags_df = pl.DataFrame(etags_list)
 
         db.upsert(
             etags_df,
             table_name="etags",
             conflict_key="endpoint",
         )
-
-        logger.debug(f"Updated {len(etags)} ETag(s)")
+        logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
     logger.info("Team sync completed successfully")

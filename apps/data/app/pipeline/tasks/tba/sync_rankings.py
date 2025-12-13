@@ -11,7 +11,7 @@ from app.services.tba import _TBAEndpoint
 
 @task(
     name="Sync Rankings",
-    description="Sync FRC rankings from The Blue Alliance",
+    description="Sync FRC rankings and ranking event info from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
@@ -24,58 +24,55 @@ def sync_rankings(active_only: bool = False):
     tba = TBAService()
     db = DBService()
 
-    rankings: list[pl.DataFrame] = []
-    ranking_infos: list[pl.DataFrame] = []
-
-    etags: list[dict[str, str]] = []
+    rankings_list: list[pl.DataFrame] = []
+    ranking_event_infos_list: list[pl.DataFrame] = []
+    etags_list: list[dict[str, str]] = []
 
     event_keys = db.get_event_keys(active_only=active_only)
-
     logger.info(f"Found {len(event_keys)} events to process")
 
-    for event in event_keys:
-        etag_key = _TBAEndpoint.RANKINGS.build(event_key=event)
+    for event_key in event_keys:
+        etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)
 
         result = tba.get_rankings(
-            event_key=event,
+            event_key=event_key,
             etag=db.get_etag(endpoint=etag_key),
         )
 
-        if result is None:  # ETag Hit:
-            logger.debug(f"Cache hit for event {event}")
-            continue  # Skip to next loop iteration
+        if result is None:  # ETag cache hit
+            logger.debug(f"Cache hit for event {event_key}")
+            continue
 
-        event_rankings, event_rankings_info, etag = result
+        event_rankings_df, event_ranking_event_info_df, etag = result
 
-        logger.debug(f"Retrieved {len(event_rankings)} rankings for event {event}")
-        rankings.append(event_rankings)
-        ranking_infos.append(event_rankings_info)
+        logger.debug(
+            f"Retrieved {len(event_rankings_df)} rankings and {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
+        )
+        rankings_list.append(event_rankings_df)
+        ranking_event_infos_list.append(event_ranking_event_info_df)
 
         if etag:
-            etags.append({"endpoint": etag_key, "etag": etag})
+            etags_list.append({"endpoint": etag_key, "etag": etag})
 
         sleep(3.0)
 
-    if ranking_infos:
-        ranking_infos_df = pl.concat(ranking_infos)
-
+    if ranking_event_infos_list:
+        ranking_event_infos_df = pl.concat(ranking_event_infos_list)
         logger.info(
-            f"Upserting {len(ranking_infos_df)} ranking info records to database"
+            f"Upserting {len(ranking_event_infos_df)} ranking event info records to database"
         )
 
         db.upsert(
-            ranking_infos_df,
-            table_name="event_ranking_info",
+            ranking_event_infos_df,
+            table_name="ranking_event_infos",
             conflict_key="event_key",
         )
-
-        logger.info("Successfully synced ranking info")
+        logger.info("Successfully synced ranking event info")
     else:
-        logger.info("No new ranking info data to sync")
+        logger.info("No new ranking event info data to sync")
 
-    if rankings:
-        rankings_df = pl.concat(rankings)
-
+    if rankings_list:
+        rankings_df = pl.concat(rankings_list)
         logger.info(f"Upserting {len(rankings_df)} rankings to database")
 
         db.upsert(
@@ -83,22 +80,19 @@ def sync_rankings(active_only: bool = False):
             table_name="rankings",
             conflict_key=["event_key", "team_key"],
         )
-
         logger.info("Successfully synced rankings")
     else:
         logger.info("No new ranking data to sync")
 
-    if etags:
-        TypeAdapter(list[ETag]).validate_python(etags)
-
-        etags_df = pl.DataFrame(etags)
+    if etags_list:
+        TypeAdapter(list[ETag]).validate_python(etags_list)
+        etags_df = pl.DataFrame(etags_list)
 
         db.upsert(
             etags_df,
             table_name="etags",
             conflict_key="endpoint",
         )
-
-        logger.debug(f"Updated {len(etags)} ETag(s)")
+        logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
     logger.info(f"Rankings sync completed successfully for {mode}")
