@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import MetaData, Table
+from sqlalchemy import MetaData, NullPool, Table
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -44,6 +44,11 @@ class DBService:
         self.engine = create_engine(
             self.config.db_url.get_secret_value(),
             echo=False,
+            poolclass=NullPool,
+            pool_pre_ping=True,
+            connect_args={
+                "connect_timeout": 10,
+            },
         )
 
         try:
