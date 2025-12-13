@@ -6,9 +6,34 @@ from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance
-    from .district import District
     from .match import Match
     from .ranking import EventRankingInfo, Ranking
+
+
+class EventDistrict(SQLModel, table=True):
+    __tablename__ = "event_districts"  # type: ignore[reportAssignmentType]
+
+    key: str = Field(
+        primary_key=True,
+        description="District key with format yyyy[DISTRICT_CODE], e.g. '2016ne'.",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+
+    abbreviation: str = Field(
+        description="Short identifier for the district (e.g. 'ne', 'pnw').",
+    )
+
+    display_name: str = Field(
+        description="Full display name for the district.",
+    )
+
+    year: int = Field(
+        index=True,
+        description="Competition year for this district.",
+        ge=1992,
+    )
+
+    events: list["Event"] = Relationship(back_populates="district")
 
 
 class Event(SQLModel, table=True):
@@ -150,7 +175,7 @@ class Event(SQLModel, table=True):
 
     district_key: str | None = Field(
         default=None,
-        foreign_key="districts.key",
+        foreign_key="event_districts.key",
         index=True,
         description="District key if this is a district event.",
     )
@@ -169,7 +194,7 @@ class Event(SQLModel, table=True):
         description="Event keys for divisions at this event (for championship events).",
     )
 
-    district: "District" = Relationship(back_populates="events")
+    district: "EventDistrict" = Relationship(back_populates="events")
 
     parent_event: "Event" = Relationship(
         back_populates="division_events",

@@ -14,8 +14,8 @@ from app.models import ETag  # noqa: F401
 from app.models.tba import (  # noqa: F401
     Alliance,
     AllianceTeam,
-    District,
     Event,
+    EventDistrict,
     EventRankingInfo,
     Match,
     MatchAlliance,
