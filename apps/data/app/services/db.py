@@ -16,6 +16,7 @@ from app.models.tba import (  # noqa: F401
     AllianceTeam,
     Event,
     EventDistrict,
+    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,

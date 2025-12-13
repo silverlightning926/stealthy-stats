@@ -5,9 +5,40 @@ from sqlalchemy import ARRAY, String
 from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .alliance import Alliance
-    from .match import Match
+    from .alliance import Alliance, AllianceTeam
+    from .match import Match, MatchAllianceTeam
     from .ranking import Ranking, RankingEventInfo
+    from .team import Team
+
+
+class EventTeam(SQLModel, table=True):
+    __tablename__ = "event_teams"  # pyright: ignore[reportAssignmentType]
+
+    event_key: str = Field(
+        primary_key=True,
+        foreign_key="events.key",
+        index=True,
+        description="TBA event key.",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+    team_key: str = Field(
+        primary_key=True,
+        foreign_key="teams.key",
+        index=True,
+        description="TBA team key (e.g., 'frc254').",
+        regex=r"^frc\d+$",
+    )
+
+    event: "Event" = Relationship(back_populates="event_teams")
+    team: "Team" = Relationship(back_populates="event_participations")
+
+    ranking: "Ranking" = Relationship(back_populates="event_team")
+    alliance_participations: list["AllianceTeam"] = Relationship(
+        back_populates="event_team"
+    )
+    match_participations: list["MatchAllianceTeam"] = Relationship(
+        back_populates="event_team"
+    )
 
 
 class EventDistrict(SQLModel, table=True):
@@ -155,6 +186,7 @@ class Event(SQLModel, table=True):
         back_populates="parent_event",
         sa_relationship_kwargs={"foreign_keys": "[Event.parent_event_key]"},
     )
+    event_teams: list["EventTeam"] = Relationship(back_populates="event")
     matches: list["Match"] = Relationship(back_populates="event")
     rankings: list["Ranking"] = Relationship(back_populates="event")
     ranking_info: "RankingEventInfo" = Relationship(back_populates="event")

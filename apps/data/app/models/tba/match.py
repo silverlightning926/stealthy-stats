@@ -5,8 +5,7 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .event import Event
-    from .team import Team
+    from .event import Event, EventTeam
 
 
 class MatchAllianceTeam(SQLModel, table=True):
@@ -16,6 +15,10 @@ class MatchAllianceTeam(SQLModel, table=True):
         ForeignKeyConstraint(
             ["match_key", "alliance_color"],
             ["match_alliances.match_key", "match_alliances.alliance_color"],
+        ),
+        ForeignKeyConstraint(
+            ["event_key", "team_key"],
+            ["event_teams.event_key", "event_teams.team_key"],
         ),
     )
 
@@ -33,10 +36,15 @@ class MatchAllianceTeam(SQLModel, table=True):
     )
     team_key: str = Field(
         primary_key=True,
-        foreign_key="teams.key",
         index=True,
         description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
+    )
+
+    event_key: str = Field(
+        index=True,
+        description="TBA event key (denormalized from match).",
+        regex=r"^\d{4}[a-z0-9]+$",
     )
 
     is_surrogate: bool = Field(
@@ -50,7 +58,7 @@ class MatchAllianceTeam(SQLModel, table=True):
 
     match: "Match" = Relationship(back_populates="alliance_teams")
     alliance: "MatchAlliance" = Relationship(back_populates="teams")
-    team: "Team" = Relationship(back_populates="match_participations")
+    event_team: "EventTeam" = Relationship(back_populates="match_participations")
 
 
 class MatchAlliance(SQLModel, table=True):
