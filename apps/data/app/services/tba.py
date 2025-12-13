@@ -18,13 +18,11 @@ from app.models.tba import (
     AllianceTeam,
     Event,
     EventDistrict,
-    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
     Ranking,
     RankingEventInfo,
-    RankingSortOrderInfo,
     Team,
 )
 
@@ -114,38 +112,43 @@ class TBAService:
         data, etag = response
 
         try:
-            TypeAdapter(list[Team]).validate_python(data)
-
-            teams_df = pl.from_dicts(
-                data,
-                schema={
-                    "key": pl.String,
-                    "team_number": pl.Int32,
-                    "nickname": pl.String,
-                    "name": pl.String,
-                    "school_name": pl.String,
-                    "city": pl.String,
-                    "state_prov": pl.String,
-                    "country": pl.String,
-                    "postal_code": pl.String,
-                    "website": pl.String,
-                    "rookie_year": pl.Int32,
-                },
-            ).select(
-                "key",
-                "team_number",
-                "nickname",
-                "name",
-                "school_name",
-                "city",
-                "state_prov",
-                "country",
-                "postal_code",
-                "website",
-                "rookie_year",
+            teams_df = (
+                pl.from_dicts(
+                    data,
+                    schema={
+                        "key": pl.String,
+                        "team_number": pl.Int32,
+                        "nickname": pl.String,
+                        "name": pl.String,
+                        "school_name": pl.String,
+                        "city": pl.String,
+                        "state_prov": pl.String,
+                        "country": pl.String,
+                        "postal_code": pl.String,
+                        "website": pl.String,
+                        "rookie_year": pl.Int32,
+                    },
+                )
+                .filter(~pl.col("team_number").is_between(9970, 9999))
+                .select(
+                    "key",
+                    "team_number",
+                    "nickname",
+                    "name",
+                    "school_name",
+                    "city",
+                    "state_prov",
+                    "country",
+                    "postal_code",
+                    "website",
+                    "rookie_year",
+                )
             )
 
+            TypeAdapter(list[Team]).validate_python(teams_df.to_dicts())
+
             self.logger.info(f"Processed {len(teams_df)} teams from page {page}")
+
             return (teams_df, etag)
 
         except Exception as e:
@@ -346,7 +349,7 @@ class TBAService:
                 .select("key", pl.all().exclude("key"))
             )
 
-            alliance_with_teams_df = pl.concat(
+            alliances_with_teams_df = pl.concat(
                 [
                     matches_df.select(
                         [
@@ -410,7 +413,7 @@ class TBAService:
             )
 
             match_alliance_teams_df = (
-                alliance_with_teams_df.select(
+                alliances_with_teams_df.select(
                     [
                         "match_key",
                         "alliance_color",
@@ -423,6 +426,12 @@ class TBAService:
                 .explode("team_keys")
                 .rename({"team_keys": "team_key"})
                 .filter(pl.col("team_key").is_not_null())
+                .filter(
+                    ~pl.col("team_key")
+                    .str.extract(r"^frc(\d+)$", 1)
+                    .cast(pl.Int32)
+                    .is_between(9970, 9999)
+                )
                 .with_columns(
                     [
                         pl.col("team_key")
@@ -443,7 +452,7 @@ class TBAService:
                 )
             )
 
-            match_alliances_df = alliance_with_teams_df.select(
+            match_alliances_df = alliances_with_teams_df.select(
                 [
                     "match_key",
                     "alliance_color",
@@ -452,7 +461,18 @@ class TBAService:
                 ]
             )
 
-            matches_df = matches_df.drop("alliances", "score_breakdown")
+            matches_df = matches_df.drop("alliances", "score_breakdown").select(
+                "key",
+                "event_key",
+                "comp_level",
+                "set_number",
+                "match_number",
+                "winning_alliance",
+                "time",
+                "actual_time",
+                "predicted_time",
+                "post_result_time",
+            )
 
             TypeAdapter(list[Match]).validate_python(matches_df.to_dicts())
             TypeAdapter(list[MatchAlliance]).validate_python(
@@ -463,7 +483,8 @@ class TBAService:
             )
 
             self.logger.info(
-                f"Processed {len(matches_df)} matches for event {event_key}"
+                f"Processed {len(matches_df)} matches, {len(match_alliances_df)} match alliances, "
+                f"and {len(match_alliance_teams_df)} match alliance teams for event {event_key}"
             )
 
             return (matches_df, match_alliances_df, match_alliance_teams_df, etag)
@@ -512,6 +533,12 @@ class TBAService:
                         "extra_stats": pl.List(pl.Float64),
                         "sort_orders": pl.List(pl.Float64),
                     },
+                )
+                .filter(
+                    ~pl.col("team_key")
+                    .str.extract(r"^frc(\d+)$", 1)
+                    .cast(pl.Int32)
+                    .is_between(9970, 9999)
                 )
                 .unnest("record")
                 .with_columns(pl.lit(event_key).alias("event_key"))
@@ -567,7 +594,7 @@ class TBAService:
             )
 
             self.logger.info(
-                f"Processed {len(rankings_df)} rankings for event {event_key}"
+                f"Processed {len(rankings_df)} rankings and {len(ranking_info_df)} ranking info record for event {event_key}"
             )
 
             return (rankings_df, ranking_info_df, etag)
@@ -673,6 +700,12 @@ class TBAService:
                 )
                 .explode("picks", "pick_order")
                 .filter(pl.col("picks").is_not_null())
+                .filter(
+                    ~pl.col("picks")
+                    .str.extract(r"^frc(\d+)$", 1)
+                    .cast(pl.Int32)
+                    .is_between(9970, 9999)
+                )
                 .with_columns(pl.col("pick_order").cast(pl.Int32))
                 .rename({"picks": "team_key"})
                 .select("event_key", "alliance_name", "team_key", "pick_order")
@@ -704,7 +737,7 @@ class TBAService:
             )
 
             self.logger.info(
-                f"Processed {len(alliances_df)} alliances for event {event_key}"
+                f"Processed {len(alliances_df)} alliances and {len(alliance_teams_df)} alliance teams for event {event_key}"
             )
 
             return (alliances_df, alliance_teams_df, etag)
