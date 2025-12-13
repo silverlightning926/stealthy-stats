@@ -27,4 +27,7 @@ USER prefect
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request as u; u.urlopen('http://prefect-server:4200/api/health', timeout=5)" || exit 1
+
 CMD ["python", "main.py"]

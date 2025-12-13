@@ -58,6 +58,8 @@ services:
     networks:
       - data-network
     restart: unless-stopped
+    volumes:
+      - ./app:/app/app:ro
 
 volumes:
   prefect-db:
