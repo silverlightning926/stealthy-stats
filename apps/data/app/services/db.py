@@ -23,11 +23,6 @@ from app.models.tba import (  # noqa: F401
     Team,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
 
 class _DBConfig(BaseSettings):
     model_config = SettingsConfigDict(

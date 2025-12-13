@@ -24,11 +24,6 @@ from app.models.tba import (
     Team,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
 
 class _TBAEndpoint(StrEnum):
     TEAMS = "/teams/{page}"
