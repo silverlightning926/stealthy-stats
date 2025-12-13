@@ -1,11 +1,51 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ARRAY, Column, String
+from sqlalchemy import ForeignKeyConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .event import Event
     from .team import Team
+
+
+class AllianceTeam(SQLModel, table=True):
+    __tablename__ = "alliance_teams"  # type: ignore[reportAssignmentType]
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["event_key", "alliance_name"],
+            ["alliances.event_key", "alliances.name"],
+        ),
+    )
+
+    event_key: str = Field(
+        primary_key=True,
+        index=True,
+        description="TBA event key.",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+
+    alliance_name: str = Field(
+        primary_key=True,
+        description="Alliance name/identifier.",
+    )
+
+    team_key: str = Field(
+        foreign_key="teams.key",
+        primary_key=True,
+        index=True,
+        description="TBA team key (e.g. 'frc254').",
+        regex=r"^frc\d+$",
+    )
+
+    pick_order: int | None = Field(
+        default=None,
+        description="Pick order (1 = captain, 2 = first pick, etc.). NULL for declined teams.",
+        ge=1,
+    )
+
+    alliance: "Alliance" = Relationship(back_populates="teams")
+    team: "Team" = Relationship(back_populates="alliance_participations")
 
 
 class Alliance(SQLModel, table=True):
@@ -22,17 +62,6 @@ class Alliance(SQLModel, table=True):
     name: str = Field(
         primary_key=True,
         description="Alliance name/identifier (e.g. 'Alliance 1', 'Alliance 2').",
-    )
-
-    picks: list[str] = Field(
-        sa_column=Column(ARRAY(String)),
-        description="Team keys picked for the alliance. First pick is the captain.",
-    )
-
-    declines: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(ARRAY(String)),
-        description="Team keys that declined to join this alliance.",
     )
 
     backup_in: str | None = Field(
@@ -128,6 +157,8 @@ class Alliance(SQLModel, table=True):
     )
 
     event: "Event" = Relationship(back_populates="alliances")
+
+    teams: list["AllianceTeam"] = Relationship(back_populates="alliance")
 
     team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .alliance import Alliance
+    from .alliance import Alliance, AllianceTeam
     from .match import MatchAllianceTeam
     from .ranking import Ranking
 
@@ -68,6 +68,8 @@ class Team(SQLModel, table=True):
     )
 
     rankings: list["Ranking"] = Relationship(back_populates="team")
+
+    alliance_participations: list["AllianceTeam"] = Relationship(back_populates="team")
 
     alliances_backup_in: list["Alliance"] = Relationship(
         back_populates="team_backup_in",
