@@ -17,16 +17,16 @@ def main():
             team_count = session.exec(select(func.count(Team.key))).one()  # pyright: ignore[reportArgumentType]
             event_count = session.exec(select(func.count(Event.key))).one()  # pyright: ignore[reportArgumentType]
             match_count = session.exec(select(func.count(Match.key))).one()  # pyright: ignore[reportArgumentType]
-            alliance_count = session.exec(select(func.count(Alliance.event_key))).one()  # pyright: ignore[reportArgumentType]
             ranking_count = session.exec(select(func.count(Ranking.event_key))).one()  # pyright: ignore[reportArgumentType]
+            alliance_count = session.exec(select(func.count(Alliance.event_key))).one()  # pyright: ignore[reportArgumentType]
 
             if any(
                 [
                     team_count == 0,
                     event_count == 0,
                     match_count == 0,
-                    alliance_count == 0,
                     ranking_count == 0,
+                    alliance_count == 0,
                 ]
             ):
                 full_sync()
