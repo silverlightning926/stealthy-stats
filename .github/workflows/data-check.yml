@@ -1,0 +1,44 @@
+name: Data | Lint, Format, Type Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/data/**/*.py"
+      - "apps/data/pyproject.toml"
+      - "apps/data/uv.lock"
+      - ".github/workflows/data-check.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/data/**/*.py"
+      - "apps/data/pyproject.toml"
+      - "apps/data/uv.lock"
+      - ".github/workflows/data-check.yml"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/data
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6.6.1
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run check
+        run: uv run task check
