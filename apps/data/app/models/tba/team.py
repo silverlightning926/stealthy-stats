@@ -4,6 +4,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance
+    from .match import MatchAllianceTeam
     from .ranking import Ranking
 
 
@@ -82,4 +83,8 @@ class Team(SQLModel, table=True):
             "foreign_keys": "[Alliance.backup_out]",
             "primaryjoin": "Team.key == Alliance.backup_out",
         },
+    )
+
+    match_participations: list["MatchAllianceTeam"] = Relationship(
+        back_populates="team"
     )

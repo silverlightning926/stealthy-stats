@@ -1,11 +1,57 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ARRAY, JSON, Column, DateTime, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .event import Event
+    from .team import Team
+
+
+class MatchAllianceTeam(SQLModel, table=True):
+    __tablename__ = "match_alliance_teams"  # type: ignore[reportAssignmentType]
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["match_key", "alliance_color"],
+            ["match_alliances.match_key", "match_alliances.alliance_color"],
+        ),
+    )
+
+    match_key: str = Field(
+        primary_key=True,
+        index=True,
+        description="TBA match key.",
+    )
+
+    alliance_color: str = Field(
+        primary_key=True,
+        description="Alliance color: 'red' or 'blue'.",
+        regex=r"^(red|blue)$",
+    )
+
+    team_key: str = Field(
+        foreign_key="teams.key",
+        primary_key=True,
+        index=True,
+        description="TBA team key (e.g. 'frc254').",
+        regex=r"^frc\d+$",
+    )
+
+    is_surrogate: bool = Field(
+        default=False,
+        description="Whether this team is a surrogate.",
+    )
+
+    is_dq: bool = Field(
+        default=False,
+        description="Whether this team was disqualified.",
+    )
+
+    match: "Match" = Relationship(back_populates="alliance_teams")
+    alliance: "MatchAlliance" = Relationship(back_populates="teams")
+    team: "Team" = Relationship(back_populates="match_participations")
 
 
 class MatchAlliance(SQLModel, table=True):
@@ -28,23 +74,6 @@ class MatchAlliance(SQLModel, table=True):
         description="Alliance score (-1 for unplayed matches).",
     )
 
-    team_keys: list[str] = Field(
-        sa_column=Column(ARRAY(String)),
-        description="TBA team keys (e.g. 'frc254') for teams on this alliance.",
-    )
-
-    surrogate_team_keys: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(ARRAY(String)),
-        description="TBA team keys of surrogate teams.",
-    )
-
-    dq_team_keys: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(ARRAY(String)),
-        description="TBA team keys of disqualified teams.",
-    )
-
     score_breakdown: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSON),
@@ -52,6 +81,7 @@ class MatchAlliance(SQLModel, table=True):
     )
 
     match: "Match" = Relationship(back_populates="alliances")
+    teams: list["MatchAllianceTeam"] = Relationship(back_populates="alliance")
 
 
 class Match(SQLModel, table=True):
@@ -118,3 +148,10 @@ class Match(SQLModel, table=True):
 
     event: "Event" = Relationship(back_populates="matches")
     alliances: list["MatchAlliance"] = Relationship(back_populates="match")
+    alliance_teams: list["MatchAllianceTeam"] = Relationship(
+        back_populates="match",
+        sa_relationship_kwargs={
+            "foreign_keys": "[MatchAllianceTeam.match_key]",
+            "primaryjoin": "Match.key == MatchAllianceTeam.match_key",
+        },
+    )

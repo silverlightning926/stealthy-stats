@@ -18,6 +18,7 @@ from app.models.tba import (  # noqa: F401
     EventRankingInfo,
     Match,
     MatchAlliance,
+    MatchAllianceTeam,
     Ranking,
     RankingInfo,
     Team,
