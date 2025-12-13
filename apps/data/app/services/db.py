@@ -16,12 +16,12 @@ from app.models.tba import (  # noqa: F401
     AllianceTeam,
     Event,
     EventDistrict,
-    EventRankingInfo,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
     Ranking,
-    RankingInfo,
+    RankingEventInfo,
+    RankingSortOrderInfo,
     Team,
 )
 

@@ -9,68 +9,62 @@ if TYPE_CHECKING:
 
 
 class Team(SQLModel, table=True):
-    __tablename__ = "teams"  # type: ignore[reportAssignmentType]
+    __tablename__ = "teams"  # pyright: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
-        description="TBA team key with format 'frcXXXX' where XXXX is the team number.",
+        description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
     )
 
     team_number: int = Field(
         index=True,
-        description="Official team number issued by FIRST.",
+        description="Official FIRST team number.",
         gt=0,
     )
-
     nickname: str = Field(
-        description="Team nickname provided by FIRST.",
+        description="Team nickname.",
     )
-
     name: str = Field(
-        description="Official long name registered with FIRST.",
+        description="Official registered team name.",
     )
 
     school_name: str | None = Field(
         default=None,
-        description="Name of team school or affiliated group registered with FIRST.",
+        description="School or organization name.",
     )
-
     city: str | None = Field(
         default=None,
-        description="City derived from the address registered with FIRST.",
+        description="Team city.",
     )
-
     state_prov: str | None = Field(
         default=None,
-        description="State/province derived from the address registered with FIRST.",
+        description="Team state or province.",
     )
-
     country: str | None = Field(
         default=None,
-        description="Country derived from the address registered with FIRST.",
+        description="Team country.",
     )
-
     postal_code: str | None = Field(
         default=None,
-        description="Postal code from the team address.",
+        description="Team postal code.",
     )
-
     website: str | None = Field(
         default=None,
-        description="Official website associated with the team.",
+        description="Team website URL.",
     )
-
     rookie_year: int | None = Field(
         default=None,
-        description="First year the team officially competed.",
+        index=True,
+        description="Year the team first competed.",
         ge=1992,
     )
 
     rankings: list["Ranking"] = Relationship(back_populates="team")
-
     alliance_participations: list["AllianceTeam"] = Relationship(back_populates="team")
-
+    match_participations: list["MatchAllianceTeam"] = Relationship(
+        back_populates="team"
+    )
     alliances_backup_in: list["Alliance"] = Relationship(
         back_populates="team_backup_in",
         sa_relationship_kwargs={
@@ -78,15 +72,10 @@ class Team(SQLModel, table=True):
             "primaryjoin": "Team.key == Alliance.backup_in",
         },
     )
-
     alliances_backup_out: list["Alliance"] = Relationship(
         back_populates="team_backup_out",
         sa_relationship_kwargs={
             "foreign_keys": "[Alliance.backup_out]",
             "primaryjoin": "Team.key == Alliance.backup_out",
         },
-    )
-
-    match_participations: list["MatchAllianceTeam"] = Relationship(
-        back_populates="team"
     )

@@ -15,12 +15,15 @@ from tenacity import (
 
 from app.models.tba import (
     Alliance,
-    District,
+    AllianceTeam,
     Event,
-    EventRankingInfo,
+    EventDistrict,
     Match,
     MatchAlliance,
+    MatchAllianceTeam,
     Ranking,
+    RankingEventInfo,
+    RankingSortOrderInfo,
     Team,
 )
 

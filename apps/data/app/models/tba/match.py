@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class MatchAllianceTeam(SQLModel, table=True):
-    __tablename__ = "match_alliance_teams"  # type: ignore[reportAssignmentType]
+    __tablename__ = "match_alliance_teams"  # pyright: ignore[reportAssignmentType]
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -21,32 +21,31 @@ class MatchAllianceTeam(SQLModel, table=True):
 
     match_key: str = Field(
         primary_key=True,
+        foreign_key="matches.key",
         index=True,
         description="TBA match key.",
+        regex=r"^\d{4}[a-z0-9]+_(qm|ef|qf|sf|f)\d*m\d+$",
     )
-
     alliance_color: str = Field(
         primary_key=True,
-        description="Alliance color: 'red' or 'blue'.",
+        description="Alliance color.",
         regex=r"^(red|blue)$",
     )
-
     team_key: str = Field(
-        foreign_key="teams.key",
         primary_key=True,
+        foreign_key="teams.key",
         index=True,
-        description="TBA team key (e.g. 'frc254').",
+        description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
     )
 
     is_surrogate: bool = Field(
         default=False,
-        description="Whether this team is a surrogate.",
+        description="Whether team is a surrogate.",
     )
-
     is_dq: bool = Field(
         default=False,
-        description="Whether this team was disqualified.",
+        description="Whether team was disqualified.",
     )
 
     match: "Match" = Relationship(back_populates="alliance_teams")
@@ -55,29 +54,29 @@ class MatchAllianceTeam(SQLModel, table=True):
 
 
 class MatchAlliance(SQLModel, table=True):
-    __tablename__ = "match_alliances"  # type: ignore[reportAssignmentType]
+    __tablename__ = "match_alliances"  # pyright: ignore[reportAssignmentType]
 
     match_key: str = Field(
-        foreign_key="matches.key",
         primary_key=True,
+        foreign_key="matches.key",
         index=True,
-        description="TBA match key this alliance belongs to.",
+        description="TBA match key.",
+        regex=r"^\d{4}[a-z0-9]+_(qm|ef|qf|sf|f)\d*m\d+$",
     )
-
     alliance_color: str = Field(
         primary_key=True,
-        description="Alliance color: 'red' or 'blue'.",
+        description="Alliance color.",
         regex=r"^(red|blue)$",
     )
 
     score: int = Field(
-        description="Alliance score (-1 for unplayed matches).",
+        description="Alliance score (-1 if unplayed).",
     )
 
     score_breakdown: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSON),
-        description="Detailed score breakdown (auto, teleop, etc). Year-specific structure.",
+        description="Detailed year-specific score breakdown.",
     )
 
     match: "Match" = Relationship(back_populates="alliances")
@@ -85,65 +84,60 @@ class MatchAlliance(SQLModel, table=True):
 
 
 class Match(SQLModel, table=True):
-    __tablename__ = "matches"  # type: ignore[reportAssignmentType]
+    __tablename__ = "matches"  # pyright: ignore[reportAssignmentType]
 
     key: str = Field(
         primary_key=True,
-        description="TBA match key: yyyy[EVENT_CODE]_[COMP_LEVEL]m[MATCH_NUMBER], e.g. '2024pnw_qm1'.",
+        description="TBA match key (e.g., '2024pnw_qm1').",
         regex=r"^\d{4}[a-z0-9]+_(qm|ef|qf|sf|f)\d*m\d+$",
     )
 
     event_key: str = Field(
         foreign_key="events.key",
         index=True,
-        description="Event key where this match was played.",
+        description="TBA event key.",
         regex=r"^\d{4}[a-z0-9]+$",
     )
 
     comp_level: str = Field(
         index=True,
-        description="Competition level: qm (quals), ef/qf/sf/f (playoffs).",
+        description="Competition level (qm, ef, qf, sf, f).",
         regex=r"^(qm|ef|qf|sf|f)$",
     )
-
     set_number: int = Field(
-        description="Set number in playoff series (1 for single-match rounds).",
+        description="Set number in playoff series.",
         ge=1,
     )
-
     match_number: int = Field(
-        description="Match number within the competition level.",
+        description="Match number within competition level.",
         ge=1,
     )
 
     winning_alliance: str = Field(
         default="",
-        description="Winning alliance color ('red', 'blue', or empty string for tie/unplayed).",
+        description="Winning alliance color (empty if tie/unplayed).",
         regex=r"^(red|blue|)$",
     )
 
     time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="Scheduled match time from published schedule.",
+        description="Scheduled match time.",
     )
-
     actual_time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
         description="Actual match start time.",
     )
-
     predicted_time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="TBA-predicted match start time.",
+        description="TBA predicted match time.",
     )
-
     post_result_time: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True)),
-        description="Time when match results were posted.",
+        description="Time when results were posted.",
     )
 
     event: "Event" = Relationship(back_populates="matches")

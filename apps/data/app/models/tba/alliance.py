@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class AllianceTeam(SQLModel, table=True):
-    __tablename__ = "alliance_teams"  # type: ignore[reportAssignmentType]
+    __tablename__ = "alliance_teams"  # pyright: ignore[reportAssignmentType]
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -24,23 +24,21 @@ class AllianceTeam(SQLModel, table=True):
         description="TBA event key.",
         regex=r"^\d{4}[a-z0-9]+$",
     )
-
     alliance_name: str = Field(
         primary_key=True,
-        description="Alliance name/identifier.",
+        description="Alliance identifier (e.g., 'Alliance 1').",
     )
-
     team_key: str = Field(
-        foreign_key="teams.key",
         primary_key=True,
+        foreign_key="teams.key",
         index=True,
-        description="TBA team key (e.g. 'frc254').",
+        description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
     )
 
     pick_order: int | None = Field(
         default=None,
-        description="Pick order (1 = captain, 2 = first pick, etc.). NULL for declined teams.",
+        description="Pick order (1=captain, 2=first pick). Null if declined.",
         ge=1,
     )
 
@@ -49,117 +47,89 @@ class AllianceTeam(SQLModel, table=True):
 
 
 class Alliance(SQLModel, table=True):
-    __tablename__ = "alliances"  # type: ignore[reportAssignmentType]
+    __tablename__ = "alliances"  # pyright: ignore[reportAssignmentType]
 
     event_key: str = Field(
-        foreign_key="events.key",
         primary_key=True,
+        foreign_key="events.key",
         index=True,
-        description="TBA event key this alliance belongs to.",
+        description="TBA event key.",
         regex=r"^\d{4}[a-z0-9]+$",
     )
-
     name: str = Field(
         primary_key=True,
-        description="Alliance name/identifier (e.g. 'Alliance 1', 'Alliance 2').",
+        description="Alliance identifier (e.g., 'Alliance 1').",
     )
 
     backup_in: str | None = Field(
         default=None,
         foreign_key="teams.key",
         index=True,
-        description="Team key that was called in as a backup replacement.",
+        description="Team called in as backup.",
         regex=r"^frc\d+$",
     )
-
     backup_out: str | None = Field(
         default=None,
         foreign_key="teams.key",
         index=True,
-        description="Team key that was replaced by the backup team.",
+        description="Team replaced by backup.",
         regex=r"^frc\d+$",
-    )
-
-    playoff_average: float | None = Field(
-        default=None,
-        description="Average match score during playoffs (year-specific, may be null).",
-    )
-
-    playoff_type: int | None = Field(
-        default=None,
-        description="Playoff type identifier (may be null).",
-        ge=0,
     )
 
     status: str | None = Field(
         default=None,
-        description="Alliance status in playoffs.",
+        description="Alliance playoff status.",
         regex=r"^(eliminated|playing|won)$",
     )
-
-    wins: int | None = Field(
-        default=None,
-        description="Total playoff wins.",
-        ge=0,
-    )
-
-    losses: int | None = Field(
-        default=None,
-        description="Total playoff losses.",
-        ge=0,
-    )
-
-    ties: int | None = Field(
-        default=None,
-        description="Total playoff ties.",
-        ge=0,
-    )
-
     level: str | None = Field(
         default=None,
-        description="Current playoff level: qm/ef/qf/sf/f.",
+        description="Current playoff level.",
         regex=r"^(qm|ef|qf|sf|f)$",
     )
 
+    wins: int | None = Field(default=None, description="Total playoff wins.", ge=0)
+    losses: int | None = Field(default=None, description="Total playoff losses.", ge=0)
+    ties: int | None = Field(default=None, description="Total playoff ties.", ge=0)
     current_level_wins: int | None = Field(
         default=None,
-        description="Wins at the current playoff level.",
+        description="Wins at current playoff level.",
         ge=0,
     )
-
     current_level_losses: int | None = Field(
         default=None,
-        description="Losses at the current playoff level.",
+        description="Losses at current playoff level.",
         ge=0,
     )
-
     current_level_ties: int | None = Field(
         default=None,
-        description="Ties at the current playoff level.",
+        description="Ties at current playoff level.",
         ge=0,
     )
 
-    advanced_to_round_robin_finals: bool | None = Field(
-        default=None,
-        description="Whether the alliance advanced to round robin finals.",
+    playoff_type: int | None = Field(
+        default=None, description="Playoff type enum.", ge=0
     )
-
+    playoff_average: float | None = Field(
+        default=None,
+        description="Average playoff match score.",
+    )
     double_elim_round: str | None = Field(
         default=None,
-        description="Current round in double elimination format.",
-        regex=r"^(Finals|Round 1|Round 2|Round 3|Round 4|Round 5)$",
+        description="Current double elimination round.",
+        regex=r"^(Finals|Round [1-5])$",
     )
-
     round_robin_rank: int | None = Field(
         default=None,
-        description="Rank in round robin play.",
+        description="Round robin ranking.",
         ge=1,
+    )
+    advanced_to_round_robin_finals: bool | None = Field(
+        default=None,
+        description="Whether alliance advanced to round robin finals.",
     )
 
     event: "Event" = Relationship(back_populates="alliances")
-
     teams: list["AllianceTeam"] = Relationship(back_populates="alliance")
-
     team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",
         sa_relationship_kwargs={
@@ -167,7 +137,6 @@ class Alliance(SQLModel, table=True):
             "primaryjoin": "Alliance.backup_in == Team.key",
         },
     )
-
     team_backup_out: "Team" = Relationship(
         back_populates="alliances_backup_out",
         sa_relationship_kwargs={
