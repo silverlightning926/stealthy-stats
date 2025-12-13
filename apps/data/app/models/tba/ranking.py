@@ -1,22 +1,24 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON
-from sqlmodel import Column, Field, ForeignKeyConstraint, Relationship, SQLModel
+from sqlalchemy import JSON, ForeignKeyConstraint
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .event import Event, EventTeam
 
 
 class RankingSortOrderInfo(SQLModel):
-    name: str = Field(description="Name of the ranking field.")
+    name: str = Field(
+        description="Name of the ranking field.",
+    )
     precision: int = Field(
-        description="Number of decimal digits for this field.",
         ge=0,
+        description="Number of decimal digits for this field.",
     )
 
 
 class RankingEventInfo(SQLModel, table=True):
-    __tablename__ = "ranking_event_info"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "ranking_event_infos"  # pyright: ignore[reportAssignmentType]
 
     event_key: str = Field(
         primary_key=True,
@@ -36,7 +38,9 @@ class RankingEventInfo(SQLModel, table=True):
         description="Metadata for year-specific sort_orders values.",
     )
 
-    event: "Event" = Relationship(back_populates="ranking_info")
+    event: "Event" = Relationship(
+        back_populates="ranking_info",
+    )
 
 
 class Ranking(SQLModel, table=True):
@@ -65,36 +69,36 @@ class Ranking(SQLModel, table=True):
     )
 
     rank: int = Field(
-        description="Team's rank at this event.",
         ge=1,
+        description="Team's rank at this event.",
     )
     matches_played: int = Field(
+        ge=0,
         description="Number of qualification matches played.",
-        ge=0,
     )
+
     wins: int = Field(
-        description="Number of qualification wins.",
         ge=0,
+        description="Number of qualification wins.",
     )
     losses: int = Field(
-        description="Number of qualification losses.",
         ge=0,
+        description="Number of qualification losses.",
     )
     ties: int = Field(
-        description="Number of qualification ties.",
         ge=0,
+        description="Number of qualification ties.",
     )
 
     dq: int = Field(
         default=0,
-        description="Number of disqualifications.",
         ge=0,
+        description="Number of disqualifications.",
     )
     qual_average: float | None = Field(
         default=None,
         description="Average qualification match score (year-specific).",
     )
-
     extra_stats: list[float] | None = Field(
         default=None,
         sa_column=Column(JSON),
@@ -106,5 +110,12 @@ class Ranking(SQLModel, table=True):
         description="Year-specific ranking values (see RankingEventInfo.sort_order_info).",
     )
 
-    event: "Event" = Relationship(back_populates="rankings")
-    event_team: "EventTeam" = Relationship(back_populates="ranking")
+    event: "Event" = Relationship(
+        back_populates="rankings",
+    )
+    event_team: "EventTeam" = Relationship(
+        back_populates="ranking",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )

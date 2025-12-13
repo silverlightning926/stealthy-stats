@@ -13,8 +13,8 @@ __all__ = [
     "Match",
     "MatchAlliance",
     "MatchAllianceTeam",
-    "RankingEventInfo",
     "Ranking",
+    "RankingEventInfo",
     "RankingSortOrderInfo",
     "Team",
 ]

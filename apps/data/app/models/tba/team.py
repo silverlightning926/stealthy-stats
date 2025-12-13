@@ -18,8 +18,8 @@ class Team(SQLModel, table=True):
 
     team_number: int = Field(
         index=True,
-        description="Official FIRST team number.",
         gt=0,
+        description="Official FIRST team number.",
     )
     nickname: str = Field(
         description="Team nickname.",
@@ -55,22 +55,24 @@ class Team(SQLModel, table=True):
     rookie_year: int | None = Field(
         default=None,
         index=True,
-        description="Year the team first competed.",
         ge=1992,
+        description="Year the team first competed.",
     )
 
-    event_participations: list["EventTeam"] = Relationship(back_populates="team")
+    event_participations: list["EventTeam"] = Relationship(
+        back_populates="team",
+    )
     alliances_backup_in: list["Alliance"] = Relationship(
         back_populates="team_backup_in",
         sa_relationship_kwargs={
-            "foreign_keys": "[Alliance.backup_in]",
             "primaryjoin": "Team.key == Alliance.backup_in",
+            "foreign_keys": "[Alliance.backup_in]",
         },
     )
     alliances_backup_out: list["Alliance"] = Relationship(
         back_populates="team_backup_out",
         sa_relationship_kwargs={
-            "foreign_keys": "[Alliance.backup_out]",
             "primaryjoin": "Team.key == Alliance.backup_out",
+            "foreign_keys": "[Alliance.backup_out]",
         },
     )

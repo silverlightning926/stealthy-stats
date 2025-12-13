@@ -41,12 +41,19 @@ class AllianceTeam(SQLModel, table=True):
 
     pick_order: int | None = Field(
         default=None,
-        description="Pick order (1=captain, 2=first pick). Null if declined.",
         ge=1,
+        description="Pick order (1=captain, 2=first pick). Null if declined.",
     )
 
-    alliance: "Alliance" = Relationship(back_populates="teams")
-    event_team: "EventTeam" = Relationship(back_populates="alliance_participations")
+    alliance: "Alliance" = Relationship(
+        back_populates="teams",
+    )
+    event_team: "EventTeam" = Relationship(
+        back_populates="alliance_participations",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )
 
 
 class Alliance(SQLModel, table=True):
@@ -90,27 +97,42 @@ class Alliance(SQLModel, table=True):
         regex=r"^(qm|ef|qf|sf|f)$",
     )
 
-    wins: int | None = Field(default=None, description="Total playoff wins.", ge=0)
-    losses: int | None = Field(default=None, description="Total playoff losses.", ge=0)
-    ties: int | None = Field(default=None, description="Total playoff ties.", ge=0)
+    wins: int | None = Field(
+        default=None,
+        ge=0,
+        description="Total playoff wins.",
+    )
+    losses: int | None = Field(
+        default=None,
+        ge=0,
+        description="Total playoff losses.",
+    )
+    ties: int | None = Field(
+        default=None,
+        ge=0,
+        description="Total playoff ties.",
+    )
+
     current_level_wins: int | None = Field(
         default=None,
-        description="Wins at current playoff level.",
         ge=0,
+        description="Wins at current playoff level.",
     )
     current_level_losses: int | None = Field(
         default=None,
-        description="Losses at current playoff level.",
         ge=0,
+        description="Losses at current playoff level.",
     )
     current_level_ties: int | None = Field(
         default=None,
-        description="Ties at current playoff level.",
         ge=0,
+        description="Ties at current playoff level.",
     )
 
     playoff_type: int | None = Field(
-        default=None, description="Playoff type enum.", ge=0
+        default=None,
+        ge=0,
+        description="Playoff type enum.",
     )
     playoff_average: float | None = Field(
         default=None,
@@ -123,27 +145,31 @@ class Alliance(SQLModel, table=True):
     )
     round_robin_rank: int | None = Field(
         default=None,
-        description="Round robin ranking.",
         ge=1,
+        description="Round robin ranking.",
     )
     advanced_to_round_robin_finals: bool | None = Field(
         default=None,
         description="Whether alliance advanced to round robin finals.",
     )
 
-    event: "Event" = Relationship(back_populates="alliances")
-    teams: list["AllianceTeam"] = Relationship(back_populates="alliance")
+    event: "Event" = Relationship(
+        back_populates="alliances",
+    )
+    teams: list["AllianceTeam"] = Relationship(
+        back_populates="alliance",
+    )
     team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",
         sa_relationship_kwargs={
-            "foreign_keys": "[Alliance.backup_in]",
             "primaryjoin": "Alliance.backup_in == Team.key",
+            "foreign_keys": "[Alliance.backup_in]",
         },
     )
     team_backup_out: "Team" = Relationship(
         back_populates="alliances_backup_out",
         sa_relationship_kwargs={
-            "foreign_keys": "[Alliance.backup_out]",
             "primaryjoin": "Alliance.backup_out == Team.key",
+            "foreign_keys": "[Alliance.backup_out]",
         },
     )

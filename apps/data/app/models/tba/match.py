@@ -56,9 +56,21 @@ class MatchAllianceTeam(SQLModel, table=True):
         description="Whether team was disqualified.",
     )
 
-    match: "Match" = Relationship(back_populates="alliance_teams")
-    alliance: "MatchAlliance" = Relationship(back_populates="teams")
-    event_team: "EventTeam" = Relationship(back_populates="match_participations")
+    match: "Match" = Relationship(
+        back_populates="alliance_teams",
+    )
+    alliance: "MatchAlliance" = Relationship(
+        back_populates="teams",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )
+    event_team: "EventTeam" = Relationship(
+        back_populates="match_participations",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )
 
 
 class MatchAlliance(SQLModel, table=True):
@@ -87,8 +99,15 @@ class MatchAlliance(SQLModel, table=True):
         description="Detailed year-specific score breakdown.",
     )
 
-    match: "Match" = Relationship(back_populates="alliances")
-    teams: list["MatchAllianceTeam"] = Relationship(back_populates="alliance")
+    match: "Match" = Relationship(
+        back_populates="alliances",
+    )
+    teams: list["MatchAllianceTeam"] = Relationship(
+        back_populates="alliance",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )
 
 
 class Match(SQLModel, table=True):
@@ -113,12 +132,12 @@ class Match(SQLModel, table=True):
         regex=r"^(qm|ef|qf|sf|f)$",
     )
     set_number: int = Field(
-        description="Set number in playoff series.",
         ge=1,
+        description="Set number in playoff series.",
     )
     match_number: int = Field(
-        description="Match number within competition level.",
         ge=1,
+        description="Match number within competition level.",
     )
 
     winning_alliance: str = Field(
@@ -148,12 +167,16 @@ class Match(SQLModel, table=True):
         description="Time when results were posted.",
     )
 
-    event: "Event" = Relationship(back_populates="matches")
-    alliances: list["MatchAlliance"] = Relationship(back_populates="match")
+    event: "Event" = Relationship(
+        back_populates="matches",
+    )
+    alliances: list["MatchAlliance"] = Relationship(
+        back_populates="match",
+    )
     alliance_teams: list["MatchAllianceTeam"] = Relationship(
         back_populates="match",
         sa_relationship_kwargs={
-            "foreign_keys": "[MatchAllianceTeam.match_key]",
+            "viewonly": True,
             "primaryjoin": "Match.key == MatchAllianceTeam.match_key",
         },
     )

@@ -11,6 +11,32 @@ if TYPE_CHECKING:
     from .team import Team
 
 
+class EventDistrict(SQLModel, table=True):
+    __tablename__ = "event_districts"  # pyright: ignore[reportAssignmentType]
+
+    key: str = Field(
+        primary_key=True,
+        description="District key (e.g., '2024ne').",
+        regex=r"^\d{4}[a-z]+$",
+    )
+
+    year: int = Field(
+        index=True,
+        ge=1992,
+        description="Competition year.",
+    )
+    abbreviation: str = Field(
+        description="District abbreviation (e.g., 'ne', 'pnw').",
+    )
+    display_name: str = Field(
+        description="District display name.",
+    )
+
+    events: list["Event"] = Relationship(
+        back_populates="district",
+    )
+
+
 class EventTeam(SQLModel, table=True):
     __tablename__ = "event_teams"  # pyright: ignore[reportAssignmentType]
 
@@ -29,40 +55,30 @@ class EventTeam(SQLModel, table=True):
         regex=r"^frc\d+$",
     )
 
-    event: "Event" = Relationship(back_populates="event_teams")
-    team: "Team" = Relationship(back_populates="event_participations")
-
-    ranking: "Ranking" = Relationship(back_populates="event_team")
+    event: "Event" = Relationship(
+        back_populates="event_teams",
+    )
+    team: "Team" = Relationship(
+        back_populates="event_participations",
+    )
+    ranking: "Ranking" = Relationship(
+        back_populates="event_team",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
+    )
     alliance_participations: list["AllianceTeam"] = Relationship(
-        back_populates="event_team"
+        back_populates="event_team",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
     )
     match_participations: list["MatchAllianceTeam"] = Relationship(
-        back_populates="event_team"
+        back_populates="event_team",
+        sa_relationship_kwargs={
+            "viewonly": True,
+        },
     )
-
-
-class EventDistrict(SQLModel, table=True):
-    __tablename__ = "event_districts"  # pyright: ignore[reportAssignmentType]
-
-    key: str = Field(
-        primary_key=True,
-        description="District key (e.g., '2024ne').",
-        regex=r"^\d{4}[a-z]+$",
-    )
-
-    year: int = Field(
-        index=True,
-        description="Competition year.",
-        ge=1992,
-    )
-    abbreviation: str = Field(
-        description="District abbreviation (e.g., 'ne', 'pnw').",
-    )
-    display_name: str = Field(
-        description="District display name.",
-    )
-
-    events: list["Event"] = Relationship(back_populates="district")
 
 
 class Event(SQLModel, table=True):
@@ -97,16 +113,16 @@ class Event(SQLModel, table=True):
         description="FIRST event code.",
     )
     event_type: int = Field(
-        description="Event type enum (Regional=0, District=1, etc.).",
         ge=0,
+        description="Event type enum (Regional=0, District=1, etc.).",
     )
     event_type_string: str = Field(
         description="Human-readable event type.",
     )
     year: int = Field(
         index=True,
-        description="Competition year.",
         ge=1992,
+        description="Competition year.",
     )
     start_date: date = Field(
         description="Event start date.",
@@ -117,51 +133,81 @@ class Event(SQLModel, table=True):
 
     week: int | None = Field(
         default=None,
-        description="Competition week (zero-indexed, null for offseason).",
         ge=0,
+        description="Competition week (zero-indexed, null for offseason).",
     )
     short_name: str | None = Field(
         default=None,
         description="Event name without 'Regional'/'District' suffix.",
     )
 
-    city: str | None = Field(default=None, description="Event city.")
-    state_prov: str | None = Field(default=None, description="Event state or province.")
-    country: str | None = Field(default=None, description="Event country.")
-    postal_code: str | None = Field(default=None, description="Event postal code.")
-    address: str | None = Field(default=None, description="Full venue address.")
-    location_name: str | None = Field(default=None, description="Venue name.")
-    timezone: str | None = Field(default=None, description="Event timezone.")
+    city: str | None = Field(
+        default=None,
+        description="Event city.",
+    )
+    state_prov: str | None = Field(
+        default=None,
+        description="Event state or province.",
+    )
+    country: str | None = Field(
+        default=None,
+        description="Event country.",
+    )
+    postal_code: str | None = Field(
+        default=None,
+        description="Event postal code.",
+    )
+    address: str | None = Field(
+        default=None,
+        description="Full venue address.",
+    )
+    location_name: str | None = Field(
+        default=None,
+        description="Venue name.",
+    )
+    timezone: str | None = Field(
+        default=None,
+        description="Event timezone.",
+    )
     lat: float | None = Field(
         default=None,
-        description="Venue latitude.",
         ge=-90.0,
         le=90.0,
+        description="Venue latitude.",
     )
     lng: float | None = Field(
         default=None,
-        description="Venue longitude.",
         ge=-180.0,
         le=180.0,
+        description="Venue longitude.",
     )
 
-    website: str | None = Field(default=None, description="Official event website.")
-    gmaps_place_id: str | None = Field(
-        default=None, description="Google Maps Place ID."
+    website: str | None = Field(
+        default=None,
+        description="Official event website.",
     )
-    gmaps_url: str | None = Field(default=None, description="Google Maps URL.")
+    gmaps_place_id: str | None = Field(
+        default=None,
+        description="Google Maps Place ID.",
+    )
+    gmaps_url: str | None = Field(
+        default=None,
+        description="Google Maps URL.",
+    )
 
     first_event_id: str | None = Field(
-        default=None, description="FIRST internal event ID."
+        default=None,
+        description="FIRST internal event ID.",
     )
     first_event_code: str | None = Field(
-        default=None, description="FIRST public event code."
+        default=None,
+        description="FIRST public event code.",
     )
 
     playoff_type: int | None = Field(
         default=None,
-        description="Playoff format enum.",
         ge=0,
+        description="Playoff format enum.",
     )
     playoff_type_string: str | None = Field(
         default=None,
@@ -174,7 +220,9 @@ class Event(SQLModel, table=True):
         description="Division event keys (for championship events).",
     )
 
-    district: "EventDistrict" = Relationship(back_populates="events")
+    district: "EventDistrict" = Relationship(
+        back_populates="events",
+    )
     parent_event: "Event" = Relationship(
         back_populates="division_events",
         sa_relationship_kwargs={
@@ -184,10 +232,22 @@ class Event(SQLModel, table=True):
     )
     division_events: list["Event"] = Relationship(
         back_populates="parent_event",
-        sa_relationship_kwargs={"foreign_keys": "[Event.parent_event_key]"},
+        sa_relationship_kwargs={
+            "foreign_keys": "[Event.parent_event_key]",
+        },
     )
-    event_teams: list["EventTeam"] = Relationship(back_populates="event")
-    matches: list["Match"] = Relationship(back_populates="event")
-    rankings: list["Ranking"] = Relationship(back_populates="event")
-    ranking_info: "RankingEventInfo" = Relationship(back_populates="event")
-    alliances: list["Alliance"] = Relationship(back_populates="event")
+    event_teams: list["EventTeam"] = Relationship(
+        back_populates="event",
+    )
+    matches: list["Match"] = Relationship(
+        back_populates="event",
+    )
+    rankings: list["Ranking"] = Relationship(
+        back_populates="event",
+    )
+    ranking_info: "RankingEventInfo" = Relationship(
+        back_populates="event",
+    )
+    alliances: list["Alliance"] = Relationship(
+        back_populates="event",
+    )
