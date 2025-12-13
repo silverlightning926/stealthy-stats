@@ -1,7 +1,7 @@
 from time import sleep
 
 import polars as pl
-from prefect import task
+from prefect import get_run_logger, task
 from pydantic import TypeAdapter
 
 from app.models import ETag
@@ -9,7 +9,6 @@ from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 
 
-# TODO: Add Logging To Sync Team Task
 @task(
     name="Sync Matches",
     description="Sync FRC matches from The Blue Alliance",
@@ -17,6 +16,11 @@ from app.services.tba import _TBAEndpoint
     retry_delay_seconds=10,
 )
 def sync_matches(active_only: bool = False):
+    logger = get_run_logger()
+
+    mode = "active events" if active_only else "all events"
+    logger.info(f"Starting match sync from The Blue Alliance for {mode}")
+
     tba = TBAService()
     db = DBService()
 
@@ -25,7 +29,11 @@ def sync_matches(active_only: bool = False):
 
     etags: list[dict[str, str]] = []
 
-    for event in db.get_event_keys(active_only=active_only):
+    event_keys = db.get_event_keys(active_only=active_only)
+
+    logger.info(f"Found {len(event_keys)} events to process")
+
+    for event in event_keys:
         etag_key = _TBAEndpoint.MATCHES.build(event_key=event)
 
         result = tba.get_matches(
@@ -34,10 +42,12 @@ def sync_matches(active_only: bool = False):
         )
 
         if result is None:  # ETag Hit:
+            logger.debug(f"Cache hit for event {event}")
             continue  # Skip to next loop iteration
 
         event_matches, event_match_alliances, etag = result
 
+        logger.debug(f"Retrieved {len(event_matches)} matches for event {event}")
         matches.append(event_matches)
         match_alliances.append(event_match_alliances)
 
@@ -48,19 +58,33 @@ def sync_matches(active_only: bool = False):
 
     if match_alliances:
         match_alliances_df = pl.concat(match_alliances)
+
+        logger.info(f"Upserting {len(match_alliances_df)} match alliances to database")
+
         db.upsert(
             match_alliances_df,
             table_name="match_alliances",
-            conflict_key="key",
+            conflict_key=["match_key", "alliance_color"],
         )
+
+        logger.info("Successfully synced match alliances")
+    else:
+        logger.info("No new match alliance data to sync")
 
     if matches:
         matches_df = pl.concat(matches)
+
+        logger.info(f"Upserting {len(matches_df)} matches to database")
+
         db.upsert(
             matches_df,
             table_name="matches",
             conflict_key="key",
         )
+
+        logger.info("Successfully synced matches")
+    else:
+        logger.info("No new match data to sync")
 
     if etags:
         TypeAdapter(list[ETag]).validate_python(etags)
@@ -72,3 +96,7 @@ def sync_matches(active_only: bool = False):
             table_name="etags",
             conflict_key="endpoint",
         )
+
+        logger.debug(f"Updated {len(etags)} ETag(s)")
+
+    logger.info(f"Match sync completed successfully for {mode}")
