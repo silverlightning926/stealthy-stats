@@ -47,8 +47,8 @@ services:
 
   data:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/data/Dockerfile
       target: development
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
@@ -67,7 +67,8 @@ services:
       - data-network
     restart: unless-stopped
     volumes:
-      - ./app:/app/app:ro
+      - ../../apps/data/app:/app/apps/data/app:ro
+      - ../../packages:/app/packages:ro
 
 volumes:
   prefect-db:

@@ -1,4 +1,4 @@
-name: Data | Docker Publish
+name: Data | Docker Build & Publish
 
 on:
   push:

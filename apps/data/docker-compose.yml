@@ -44,8 +44,8 @@ services:
 
   data:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/data/Dockerfile
       target: production
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
