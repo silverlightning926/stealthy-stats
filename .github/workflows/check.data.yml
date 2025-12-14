@@ -7,14 +7,14 @@ on:
       - "apps/data/**/*.py"
       - "apps/data/pyproject.toml"
       - "apps/data/uv.lock"
-      - ".github/workflows/data-check.yml"
+      - ".github/workflows/check.data.yml"
   pull_request:
     branches: [main]
     paths:
       - "apps/data/**/*.py"
       - "apps/data/pyproject.toml"
       - "apps/data/uv.lock"
-      - ".github/workflows/data-check.yml"
+      - ".github/workflows/check.data.yml"
 
 jobs:
   lint:
