@@ -58,7 +58,7 @@ def sync_events():
         if etag:
             etags_list.append({"endpoint": etag_key, "etag": etag})
 
-        sleep(1.5)
+        sleep(2.0)
 
     if event_districts_list:
         event_districts_df = pl.concat(event_districts_list)

@@ -50,7 +50,7 @@ def sync_teams():
         if etag:
             etags_list.append({"endpoint": etag_key, "etag": etag})
 
-        sleep(1.5)
+        sleep(2.0)
 
     if teams_list:
         teams_df = pl.concat(teams_list)
