@@ -1,0 +1,102 @@
+services:
+  prefect-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    volumes:
+      - prefect-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data-network
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_UI_SERVE_BASE: /
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+    networks:
+      - data-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://localhost:4200/api/health', timeout=1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  data:
+    build:
+      context: ./apps/data
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
+      DATABASE_URL: ${DATABASE_URL}
+      TBA_API_KEY: ${TBA_API_KEY}
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    networks:
+      - data-network
+    restart: unless-stopped
+
+  # Fastify API
+  # api:
+  #   build:
+  #     context: ./apps/api
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     DATABASE_URL: ${DATABASE_URL}
+  #     NODE_ENV: production
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+
+  # Astro Frontend
+  # frontend:
+  #   build:
+  #     context: ./apps/frontend
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   ports:
+  #     - "4321:4321"
+  #   environment:
+  #     API_URL: http://api:3000
+  #     NODE_ENV: production
+  #   depends_on:
+  #     - api
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+
+volumes:
+  prefect-db:
+
+networks:
+  data-network:
+    driver: bridge
+
+  app-network:
+    driver: bridge
