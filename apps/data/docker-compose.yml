@@ -23,6 +23,7 @@ services:
     environment:
       PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
       PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_UI_SERVE_BASE: /
     depends_on:
       prefect-db:
         condition: service_healthy
@@ -45,6 +46,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*

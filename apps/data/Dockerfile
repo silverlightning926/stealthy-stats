@@ -13,7 +13,30 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY . .
 
-FROM python:3.14-slim-trixie
+FROM python:3.14-slim-trixie AS development
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+
+COPY . .
+
+RUN useradd -m -u 1000 prefect && \
+    chown -R prefect:prefect /app
+
+USER prefect
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "main.py"]
+
+FROM python:3.14-slim-trixie AS production
 
 WORKDIR /app
 

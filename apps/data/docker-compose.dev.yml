@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: prefect
     volumes:
       - prefect-db:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prefect"]
       interval: 10s
@@ -23,6 +25,8 @@ services:
     environment:
       PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
       PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_UI_SERVE_BASE: /
+      PREFECT_LOGGING_LEVEL: DEBUG
     depends_on:
       prefect-db:
         condition: service_healthy
@@ -45,11 +49,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
+      PREFECT_LOGGING_LEVEL: DEBUG
       DATABASE_URL: ${DATABASE_URL}
       TBA_API_KEY: ${TBA_API_KEY}
+      PYTHONUNBUFFERED: 1
+      PREFECT_API_REQUEST_TIMEOUT: 30
     env_file:
       - .env
     depends_on:
