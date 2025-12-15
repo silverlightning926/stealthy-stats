@@ -43,10 +43,7 @@ services:
       start_period: 40s
 
   data:
-    build:
-      context: ../..
-      dockerfile: apps/data/Dockerfile
-      target: production
+    image: ghcr.io/silverlightning926/stealthy-stats/data:latest
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*

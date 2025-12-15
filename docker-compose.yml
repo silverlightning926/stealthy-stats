@@ -43,10 +43,7 @@ services:
       start_period: 40s
 
   data:
-    build:
-      context: ./apps/data
-      dockerfile: Dockerfile
-      target: production
+    image: ghcr.io/silverlightning926/stealthy-stats/data:latest
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
@@ -61,10 +58,7 @@ services:
 
   # Fastify API
   # api:
-  #   build:
-  #     context: ./apps/api
-  #     dockerfile: Dockerfile
-  #     target: production
+  #   image: ghcr.io/silverlightning926/stealthy-stats/api:latest
   #   ports:
   #     - "3000:3000"
   #   environment:
@@ -76,10 +70,7 @@ services:
 
   # Astro Frontend
   # frontend:
-  #   build:
-  #     context: ./apps/frontend
-  #     dockerfile: Dockerfile
-  #     target: production
+  #   image: ghcr.io/silverlightning926/stealthy-stats/frontend:latest
   #   ports:
   #     - "4321:4321"
   #   environment:

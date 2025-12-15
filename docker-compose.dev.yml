@@ -47,11 +47,12 @@ services:
 
   data:
     build:
-      context: ./apps/data
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/data/Dockerfile
       target: development
     volumes:
-      - ./apps/data/app:/app/app:ro
+      - ./apps/data/app:/app/apps/data/app:ro
+      - ./packages:/app/packages:ro
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
@@ -70,8 +71,8 @@ services:
   # Fastify API
   # api:
   #   build:
-  #     context: ./apps/api
-  #     dockerfile: Dockerfile
+  #     context: .
+  #     dockerfile: apps/api/Dockerfile
   #     target: development
   #   ports:
   #     - "3000:3000"
@@ -89,8 +90,8 @@ services:
   # Astro Frontend
   # frontend:
   #   build:
-  #     context: ./apps/frontend
-  #     dockerfile: Dockerfile
+  #     context: .
+  #     dockerfile: apps/frontend/Dockerfile
   #     target: development
   #   ports:
   #     - "4321:4321"
