@@ -174,47 +174,52 @@ class TBAService:
         data, etag = response
 
         try:
-            events_df = pl.from_dicts(
-                data,
-                schema={
-                    "key": pl.String,
-                    "name": pl.String,
-                    "event_code": pl.String,
-                    "event_type": pl.Int32,
-                    "district": pl.Struct(
-                        {
-                            "key": pl.String,
-                            "abbreviation": pl.String,
-                            "display_name": pl.String,
-                            "year": pl.Int32,
-                        }
-                    ),
-                    "city": pl.String,
-                    "state_prov": pl.String,
-                    "country": pl.String,
-                    "start_date": pl.String,
-                    "end_date": pl.String,
-                    "year": pl.Int32,
-                    "short_name": pl.String,
-                    "event_type_string": pl.String,
-                    "week": pl.Int32,
-                    "address": pl.String,
-                    "postal_code": pl.String,
-                    "gmaps_place_id": pl.String,
-                    "gmaps_url": pl.String,
-                    "lat": pl.Float64,
-                    "lng": pl.Float64,
-                    "location_name": pl.String,
-                    "timezone": pl.String,
-                    "website": pl.String,
-                    "first_event_id": pl.String,
-                    "first_event_code": pl.String,
-                    "division_keys": pl.List(pl.String),
-                    "parent_event_key": pl.String,
-                    "playoff_type": pl.Int32,
-                    "playoff_type_string": pl.String,
-                },
-            ).filter(~pl.col("event_type").is_in([-1, 7, 99, 100]))
+            events_df = (
+                pl.from_dicts(
+                    data,
+                    schema={
+                        "key": pl.String,
+                        "name": pl.String,
+                        "event_code": pl.String,
+                        "event_type": pl.Int32,
+                        "district": pl.Struct(
+                            {
+                                "key": pl.String,
+                                "abbreviation": pl.String,
+                                "display_name": pl.String,
+                                "year": pl.Int32,
+                            }
+                        ),
+                        "city": pl.String,
+                        "state_prov": pl.String,
+                        "country": pl.String,
+                        "start_date": pl.String,
+                        "end_date": pl.String,
+                        "year": pl.Int32,
+                        "short_name": pl.String,
+                        "event_type_string": pl.String,
+                        "week": pl.Int32,
+                        "address": pl.String,
+                        "postal_code": pl.String,
+                        "gmaps_place_id": pl.String,
+                        "gmaps_url": pl.String,
+                        "lat": pl.Float64,
+                        "lng": pl.Float64,
+                        "location_name": pl.String,
+                        "timezone": pl.String,
+                        "website": pl.String,
+                        "first_event_id": pl.String,
+                        "first_event_code": pl.String,
+                        "division_keys": pl.List(pl.String),
+                        "parent_event_key": pl.String,
+                        "playoff_type": pl.Int32,
+                        "playoff_type_string": pl.String,
+                    },
+                )
+                .filter(~pl.col("event_type").is_in([-1, 7, 99, 100]))
+                .filter(~pl.col("key").is_in(["2020cmptx", "2020cmpmi", "2020award"]))
+                .filter(~pl.col("name").str.contains("Cancelled"))
+            )
 
             event_districts_df = (
                 events_df.select("district")
