@@ -161,7 +161,9 @@ class DBService:
             with self.get_session() as session:
                 if sync_type == SyncType.FULL:
                     # All inactive events, all years
-                    events = list(session.exec(select(Event)).all())
+                    events = list(
+                        session.exec(select(Event).order_by(Event.start_date)).all()  # pyright: ignore[reportArgumentType]
+                    )
                     keys = [
                         event.key
                         for event in events
@@ -170,16 +172,26 @@ class DBService:
 
                 elif sync_type == SyncType.LIVE:
                     # Active events, current year only
-                    query = select(Event).where(Event.year == datetime.now().year)
-                    events = list(session.exec(query).all())
+                    events = list(
+                        session.exec(
+                            select(Event)
+                            .where(Event.year == datetime.now().year)
+                            .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                        ).all()
+                    )
                     keys = [
                         event.key for event in events if self._is_event_active(event)
                     ]
 
                 elif sync_type == SyncType.YEAR:
                     # Inactive events, current year only
-                    query = select(Event).where(Event.year == datetime.now().year)
-                    events = list(session.exec(query).all())
+                    events = list(
+                        session.exec(
+                            select(Event)
+                            .where(Event.year == datetime.now().year)
+                            .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                        ).all()
+                    )
                     keys = [
                         event.key
                         for event in events
