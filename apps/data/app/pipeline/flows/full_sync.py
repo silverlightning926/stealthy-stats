@@ -19,26 +19,26 @@ from app.pipeline.tasks.tba import (
 def full_sync():
     logger = get_run_logger()
 
-    logger.info("Starting full sync of all FRC data")
+    logger.info("Starting full sync")
 
     try:
         logger.info("Step 1/6: Syncing teams")
         sync_teams()
 
         logger.info("Step 2/6: Syncing events")
-        sync_events()
+        sync_events(current_year=False)
 
         logger.info("Step 3/6: Syncing event teams")
-        sync_event_teams(event_filter="inactive")
+        sync_event_teams(event_filter="inactive", current_year=False)
 
         logger.info("Step 4/6: Syncing matches")
-        sync_matches(event_filter="inactive")
+        sync_matches(event_filter="inactive", current_year=False)
 
         logger.info("Step 5/6: Syncing rankings")
-        sync_rankings(event_filter="inactive")
+        sync_rankings(event_filter="inactive", current_year=False)
 
         logger.info("Step 6/6: Syncing alliances")
-        sync_alliances(event_filter="inactive")
+        sync_alliances(event_filter="inactive", current_year=False)
 
         logger.info("Full sync completed successfully")
 

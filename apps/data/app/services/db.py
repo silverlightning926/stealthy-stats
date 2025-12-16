@@ -143,18 +143,26 @@ class DBService:
             self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
             raise
 
-    def get_event_keys(self, filter: EventFilter = "all") -> list[str]:
-        self.logger.info(f"Retrieving event keys (filter={filter})")
+    def get_event_keys(
+        self, filter: EventFilter = "all", current_year: bool = False
+    ) -> list[str]:
+        self.logger.info(
+            f"Retrieving event keys (filter={filter}, current_year={current_year})"
+        )
 
         try:
             with self.get_session() as session:
                 if filter == "all":
                     query = select(Event.key)
+                    if current_year:
+                        query = query.where(Event.year == datetime.now().year)
                     keys = list(session.exec(query).all())
                     self.logger.info(f"Retrieved {len(keys)} event keys")
                     return keys
 
                 query = select(Event)
+                if current_year:
+                    query = query.where(Event.year == datetime.now().year)
                 events = session.exec(query).all()
 
                 buffer = timedelta(days=1, hours=2)

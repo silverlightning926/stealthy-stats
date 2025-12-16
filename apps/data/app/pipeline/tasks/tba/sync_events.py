@@ -16,7 +16,7 @@ from app.services.tba import _TBAEndpoint
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_events():
+def sync_events(current_year: bool = False):
     logger = get_run_logger()
     logger.info("Starting event sync from The Blue Alliance")
 
@@ -27,8 +27,13 @@ def sync_events():
     event_districts_list: list[pl.DataFrame] = []
     etags_list: list[dict[str, str]] = []
 
-    start_year = 1992
-    end_year = datetime.now().year
+    if current_year:
+        start_year = datetime.now().year
+        end_year = datetime.now().year
+    else:
+        start_year = 1992
+        end_year = datetime.now().year
+
     logger.info(f"Syncing events from {start_year} to {end_year}")
 
     for year in range(start_year, end_year + 1):

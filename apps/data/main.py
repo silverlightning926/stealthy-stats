@@ -4,7 +4,7 @@ from prefect import serve
 from sqlalchemy import func, select
 
 from app.models.tba import Alliance, Event, EventTeam, Match, Ranking, Team
-from app.pipeline.flows import full_sync, live_sync
+from app.pipeline.flows import full_sync, live_sync, year_sync
 from app.services import DBService
 
 
@@ -38,7 +38,12 @@ def main():
 
     full_sync_deployment = full_sync.to_deployment(
         name="full-sync-deployment",
-        cron="0 4 * * 1,4",
+        cron="0 0 1,15 * *",  # Midnight on the 1st and 15th of the month
+    )
+
+    year_sync_deployment = year_sync.to_deployment(
+        name="year-sync-deployment",
+        cron="0 0 * * 1,4",  # Midnight on Mondays and Thursdays
     )
 
     live_sync_deployment = live_sync.to_deployment(
@@ -46,7 +51,7 @@ def main():
         interval=timedelta(minutes=10),
     )
 
-    serve(full_sync_deployment, live_sync_deployment)  # type: ignore
+    serve(full_sync_deployment, year_sync_deployment, live_sync_deployment)  # type: ignore
 
 
 if __name__ == "__main__":

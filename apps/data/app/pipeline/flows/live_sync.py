@@ -18,12 +18,12 @@ from app.services import DBService
 def live_sync():
     logger = get_run_logger()
 
-    logger.info("Starting live sync for active events")
+    logger.info("Starting live sync")
 
     try:
         db = DBService()
 
-        active_events = db.get_event_keys(filter="active")
+        active_events = db.get_event_keys(filter="active", current_year=True)
         if not active_events:
             logger.info("No active events found - skipping live sync")
             return
@@ -33,16 +33,16 @@ def live_sync():
         )
 
         logger.info("Step 1/4: Syncing event teams for active events")
-        sync_event_teams(event_filter="active")
+        sync_event_teams(event_filter="active", current_year=True)
 
         logger.info("Step 2/4: Syncing matches for active events")
-        sync_matches(event_filter="active")
+        sync_matches(event_filter="active", current_year=True)
 
         logger.info("Step 3/4: Syncing rankings for active events")
-        sync_rankings(event_filter="active")
+        sync_rankings(event_filter="active", current_year=True)
 
         logger.info("Step 4/4: Syncing alliances for active events")
-        sync_alliances(event_filter="active")
+        sync_alliances(event_filter="active", current_year=True)
 
         logger.info("Live sync completed successfully")
 
