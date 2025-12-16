@@ -1,5 +1,5 @@
-from .event_filter import EventFilter
+from .sync_type import SyncType
 
 __all__ = [
-    "EventFilter",
+    "SyncType",
 ]

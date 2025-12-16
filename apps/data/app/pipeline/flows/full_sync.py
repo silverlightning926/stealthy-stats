@@ -8,6 +8,7 @@ from app.pipeline.tasks.tba import (
     sync_rankings,
     sync_teams,
 )
+from app.types import SyncType
 
 
 @flow(
@@ -26,19 +27,19 @@ def full_sync():
         sync_teams()
 
         logger.info("Step 2/6: Syncing events")
-        sync_events(current_year=False)
+        sync_events(sync_type=SyncType.FULL)
 
         logger.info("Step 3/6: Syncing event teams")
-        sync_event_teams(event_filter="inactive", current_year=False)
+        sync_event_teams(sync_type=SyncType.FULL)
 
         logger.info("Step 4/6: Syncing matches")
-        sync_matches(event_filter="inactive", current_year=False)
+        sync_matches(sync_type=SyncType.FULL)
 
         logger.info("Step 5/6: Syncing rankings")
-        sync_rankings(event_filter="inactive", current_year=False)
+        sync_rankings(sync_type=SyncType.FULL)
 
         logger.info("Step 6/6: Syncing alliances")
-        sync_alliances(event_filter="inactive", current_year=False)
+        sync_alliances(sync_type=SyncType.FULL)
 
         logger.info("Full sync completed successfully")
 

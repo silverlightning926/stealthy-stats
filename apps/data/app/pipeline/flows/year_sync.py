@@ -7,6 +7,7 @@ from app.pipeline.tasks.tba import (
     sync_matches,
     sync_rankings,
 )
+from app.types import SyncType
 
 
 @flow(
@@ -22,19 +23,19 @@ def year_sync():
 
     try:
         logger.info("Step 1/5: Syncing events")
-        sync_events(current_year=True)
+        sync_events(sync_type=SyncType.YEAR)
 
         logger.info("Step 2/5: Syncing event teams")
-        sync_event_teams(event_filter="inactive", current_year=True)
+        sync_event_teams(sync_type=SyncType.YEAR)
 
         logger.info("Step 3/5: Syncing matches")
-        sync_matches(event_filter="inactive", current_year=True)
+        sync_matches(sync_type=SyncType.YEAR)
 
         logger.info("Step 4/5: Syncing rankings")
-        sync_rankings(event_filter="inactive", current_year=True)
+        sync_rankings(sync_type=SyncType.YEAR)
 
         logger.info("Step 5/5: Syncing alliances")
-        sync_alliances(event_filter="inactive", current_year=True)
+        sync_alliances(sync_type=SyncType.YEAR)
 
         logger.info("Year sync completed successfully")
 

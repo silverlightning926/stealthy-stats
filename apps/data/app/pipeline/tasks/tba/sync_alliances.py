@@ -7,7 +7,7 @@ from pydantic import TypeAdapter
 from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
-from app.types import EventFilter
+from app.types import SyncType
 
 
 @task(
@@ -16,11 +16,11 @@ from app.types import EventFilter
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_alliances(event_filter: EventFilter = "all", current_year: bool = False):
+def sync_alliances(sync_type: SyncType = SyncType.FULL):
     logger = get_run_logger()
 
     logger.info(
-        f"Starting alliances sync from The Blue Alliance (event_filter={event_filter}, current_year={current_year})"
+        f"Starting alliances sync from The Blue Alliance (sync_type={sync_type.value})"
     )
 
     tba = TBAService()
@@ -30,7 +30,7 @@ def sync_alliances(event_filter: EventFilter = "all", current_year: bool = False
     alliance_teams_list: list[pl.DataFrame] = []
     etags_list: list[dict[str, str]] = []
 
-    event_keys = db.get_event_keys(filter=event_filter, current_year=current_year)
+    event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
 
     for event_key in event_keys:
@@ -95,6 +95,4 @@ def sync_alliances(event_filter: EventFilter = "all", current_year: bool = False
         )
         logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
-    logger.info(
-        f"Alliances sync completed successfully (event_filter={event_filter}, current_year={current_year})"
-    )
+    logger.info(f"Alliances sync completed successfully (sync_type={sync_type.value})")

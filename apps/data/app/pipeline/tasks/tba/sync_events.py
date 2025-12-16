@@ -8,6 +8,7 @@ from pydantic import TypeAdapter
 from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
+from app.types import SyncType
 
 
 @task(
@@ -16,9 +17,12 @@ from app.services.tba import _TBAEndpoint
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_events(current_year: bool = False):
+def sync_events(sync_type: SyncType = SyncType.FULL):
     logger = get_run_logger()
-    logger.info("Starting event sync from The Blue Alliance")
+
+    logger.info(
+        f"Starting event sync from The Blue Alliance (sync_type={sync_type.value})"
+    )
 
     tba = TBAService()
     db = DBService()
@@ -27,11 +31,14 @@ def sync_events(current_year: bool = False):
     event_districts_list: list[pl.DataFrame] = []
     etags_list: list[dict[str, str]] = []
 
-    if current_year:
+    if sync_type == SyncType.FULL:
+        start_year = 1992
+        end_year = datetime.now().year
+    elif sync_type == SyncType.LIVE:
         start_year = datetime.now().year
         end_year = datetime.now().year
-    else:
-        start_year = 1992
+    elif sync_type == SyncType.YEAR:
+        start_year = datetime.now().year
         end_year = datetime.now().year
 
     logger.info(f"Syncing events from {start_year} to {end_year}")
@@ -102,4 +109,4 @@ def sync_events(current_year: bool = False):
         )
         logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
-    logger.info("Event sync completed successfully")
+    logger.info(f"Event sync completed successfully (sync_type={sync_type.value})")

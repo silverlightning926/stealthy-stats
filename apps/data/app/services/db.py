@@ -25,7 +25,7 @@ from app.models.tba import (  # noqa: F401
     RankingSortOrderInfo,
     Team,
 )
-from app.types import EventFilter
+from app.types import SyncType
 
 
 class _DBConfig(BaseSettings):
@@ -143,53 +143,52 @@ class DBService:
             self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
             raise
 
-    def get_event_keys(
-        self, filter: EventFilter = "all", current_year: bool = False
-    ) -> list[str]:
-        self.logger.info(
-            f"Retrieving event keys (filter={filter}, current_year={current_year})"
-        )
+    def _is_event_active(self, event: Event) -> bool:
+        buffer = timedelta(days=1, hours=2)
+
+        event_tz = ZoneInfo(event.timezone) if event.timezone else ZoneInfo("UTC")
+        now_in_event_tz = datetime.now(event_tz).date()
+
+        event_start_with_buffer = event.start_date - buffer
+        event_end_with_buffer = event.end_date + buffer
+
+        return event_start_with_buffer <= now_in_event_tz <= event_end_with_buffer
+
+    def get_event_keys(self, sync_type: SyncType = SyncType.FULL) -> list[str]:
+        self.logger.info(f"Retrieving event keys for {sync_type.value} sync")
 
         try:
             with self.get_session() as session:
-                if filter == "all":
-                    query = select(Event.key)
-                    if current_year:
-                        query = query.where(Event.year == datetime.now().year)
-                    keys = list(session.exec(query).all())
-                    self.logger.info(f"Retrieved {len(keys)} event keys")
-                    return keys
+                if sync_type == SyncType.FULL:
+                    # All inactive events, all years
+                    events = list(session.exec(select(Event)).all())
+                    keys = [
+                        event.key
+                        for event in events
+                        if not self._is_event_active(event)
+                    ]
 
-                query = select(Event)
-                if current_year:
-                    query = query.where(Event.year == datetime.now().year)
-                events = session.exec(query).all()
+                elif sync_type == SyncType.LIVE:
+                    # Active events, current year only
+                    query = select(Event).where(Event.year == datetime.now().year)
+                    events = list(session.exec(query).all())
+                    keys = [
+                        event.key for event in events if self._is_event_active(event)
+                    ]
 
-                buffer = timedelta(days=1, hours=2)
-                filtered_keys = []
+                elif sync_type == SyncType.YEAR:
+                    # Inactive events, current year only
+                    query = select(Event).where(Event.year == datetime.now().year)
+                    events = list(session.exec(query).all())
+                    keys = [
+                        event.key
+                        for event in events
+                        if not self._is_event_active(event)
+                    ]
 
-                for event in events:
-                    event_tz = (
-                        ZoneInfo(event.timezone) if event.timezone else ZoneInfo("UTC")
-                    )
-                    now_in_event_tz = datetime.now(event_tz).date()
+                self.logger.info(f"Retrieved {len(keys)} event key(s)")
+                return keys
 
-                    event_start_with_buffer = event.start_date - buffer
-                    event_end_with_buffer = event.end_date + buffer
-
-                    is_active = (
-                        event_start_with_buffer
-                        <= now_in_event_tz
-                        <= event_end_with_buffer
-                    )
-
-                    if filter == "active" and is_active:
-                        filtered_keys.append(event.key)
-                    elif filter == "inactive" and not is_active:
-                        filtered_keys.append(event.key)
-
-                self.logger.info(f"Retrieved {len(filtered_keys)} {filter} event keys")
-                return filtered_keys
         except Exception as e:
             self.logger.error(f"Error retrieving event keys: {e}")
             raise
