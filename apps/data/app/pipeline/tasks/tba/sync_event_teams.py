@@ -7,6 +7,7 @@ from pydantic import TypeAdapter
 from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
+from app.types import EventFilter
 
 
 @task(
@@ -15,11 +16,10 @@ from app.services.tba import _TBAEndpoint
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_event_teams(active_only: bool = False):
+def sync_event_teams(event_filter: EventFilter = "all"):
     logger = get_run_logger()
 
-    mode = "active events" if active_only else "all events"
-    logger.info(f"Starting event teams sync from The Blue Alliance for {mode}")
+    logger.info(f"Starting event teams sync from The Blue Alliance for {event_filter}")
 
     tba = TBAService()
     db = DBService()
@@ -27,7 +27,7 @@ def sync_event_teams(active_only: bool = False):
     event_teams_list: list[pl.DataFrame] = []
     etags_list: list[dict[str, str]] = []
 
-    event_keys = db.get_event_keys(active_only=active_only)
+    event_keys = db.get_event_keys(filter=event_filter)
     logger.info(f"Found {len(event_keys)} events to process")
 
     for event_key in event_keys:
@@ -76,4 +76,4 @@ def sync_event_teams(active_only: bool = False):
         )
         logger.debug(f"Updated {len(etags_list)} ETag(s)")
 
-    logger.info(f"Event teams sync completed successfully for {mode}")
+    logger.info(f"Event teams sync completed successfully for {event_filter}")

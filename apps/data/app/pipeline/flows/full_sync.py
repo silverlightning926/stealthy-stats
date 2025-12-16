@@ -29,16 +29,16 @@ def full_sync():
         sync_events()
 
         logger.info("Step 3/6: Syncing event teams")
-        sync_event_teams(active_only=False)
+        sync_event_teams(event_filter="inactive")
 
         logger.info("Step 4/6: Syncing matches")
-        sync_matches(active_only=False)
+        sync_matches(event_filter="inactive")
 
         logger.info("Step 5/6: Syncing rankings")
-        sync_rankings(active_only=False)
+        sync_rankings(event_filter="inactive")
 
         logger.info("Step 6/6: Syncing alliances")
-        sync_alliances(active_only=False)
+        sync_alliances(event_filter="inactive")
 
         logger.info("Full sync completed successfully")
 

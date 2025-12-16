@@ -23,7 +23,7 @@ def live_sync():
     try:
         db = DBService()
 
-        active_events = db.get_event_keys(active_only=True)
+        active_events = db.get_event_keys(filter="active")
         if not active_events:
             logger.info("No active events found - skipping live sync")
             return
@@ -33,16 +33,16 @@ def live_sync():
         )
 
         logger.info("Step 1/4: Syncing event teams for active events")
-        sync_event_teams(active_only=True)
+        sync_event_teams(event_filter="active")
 
         logger.info("Step 2/4: Syncing matches for active events")
-        sync_matches(active_only=True)
+        sync_matches(event_filter="active")
 
         logger.info("Step 3/4: Syncing rankings for active events")
-        sync_rankings(active_only=True)
+        sync_rankings(event_filter="active")
 
         logger.info("Step 4/4: Syncing alliances for active events")
-        sync_alliances(active_only=True)
+        sync_alliances(event_filter="active")
 
         logger.info("Live sync completed successfully")
 

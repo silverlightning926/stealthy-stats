@@ -25,6 +25,7 @@ from app.models.tba import (  # noqa: F401
     RankingSortOrderInfo,
     Team,
 )
+from app.types import EventFilter
 
 
 class _DBConfig(BaseSettings):
@@ -142,12 +143,12 @@ class DBService:
             self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
             raise
 
-    def get_event_keys(self, active_only: bool = False) -> list[str]:
-        self.logger.info(f"Retrieving event keys (active_only={active_only})")
+    def get_event_keys(self, filter: EventFilter = "all") -> list[str]:
+        self.logger.info(f"Retrieving event keys (filter={filter})")
 
         try:
             with self.get_session() as session:
-                if not active_only:
+                if filter == "all":
                     query = select(Event.key)
                     keys = list(session.exec(query).all())
                     self.logger.info(f"Retrieved {len(keys)} event keys")
@@ -157,28 +158,30 @@ class DBService:
                 events = session.exec(query).all()
 
                 buffer = timedelta(days=1, hours=2)
-                active_keys = []
+                filtered_keys = []
 
                 for event in events:
                     event_tz = (
-                        ZoneInfo(event.timezone)
-                        if event.timezone
-                        else ZoneInfo("UTC")  # If Timezone is missing, assume UTC
+                        ZoneInfo(event.timezone) if event.timezone else ZoneInfo("UTC")
                     )
                     now_in_event_tz = datetime.now(event_tz).date()
 
                     event_start_with_buffer = event.start_date - buffer
                     event_end_with_buffer = event.end_date + buffer
 
-                    if (
+                    is_active = (
                         event_start_with_buffer
                         <= now_in_event_tz
                         <= event_end_with_buffer
-                    ):
-                        active_keys.append(event.key)
+                    )
 
-                self.logger.info(f"Retrieved {len(active_keys)} active event keys")
-                return active_keys
+                    if filter == "active" and is_active:
+                        filtered_keys.append(event.key)
+                    elif filter == "inactive" and not is_active:
+                        filtered_keys.append(event.key)
+
+                self.logger.info(f"Retrieved {len(filtered_keys)} {filter} event keys")
+                return filtered_keys
         except Exception as e:
             self.logger.error(f"Error retrieving event keys: {e}")
             raise
