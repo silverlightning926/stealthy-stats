@@ -75,6 +75,13 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
 
     if rankings_list:
         rankings_df = pl.concat(rankings_list)
+        original_rankings_df_length = len(rankings_df)
+
+        rankings_df = rankings_df.filter(pl.col("team_key").is_in(db.get_team_keys()))
+        logger.info(
+            f"Removed {len(rankings_df) - original_rankings_df_length} ghost teams"
+        )
+
         logger.info(f"Upserting {len(rankings_df)} rankings to database")
 
         db.upsert(

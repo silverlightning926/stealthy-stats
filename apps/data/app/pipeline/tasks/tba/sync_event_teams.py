@@ -56,6 +56,15 @@ def sync_event_teams(sync_type: SyncType = SyncType.FULL):
 
     if event_teams_list:
         event_teams_df = pl.concat(event_teams_list)
+        original_event_teams_df_length = len(event_teams_df)
+
+        event_teams_df = event_teams_df.filter(
+            pl.col("team_key").is_in(db.get_team_keys())
+        )
+        logger.info(
+            f"Removed {len(event_teams_df) - original_event_teams_df_length} ghost teams"
+        )
+
         logger.info(f"Upserting {len(event_teams_df)} event teams to database")
 
         db.upsert(

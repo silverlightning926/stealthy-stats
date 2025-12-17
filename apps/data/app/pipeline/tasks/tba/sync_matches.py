@@ -94,6 +94,15 @@ def sync_matches(sync_type: SyncType = SyncType.FULL):
 
     if match_alliance_teams_list:
         match_alliance_teams_df = pl.concat(match_alliance_teams_list)
+        original_match_alliance_teams_df_length = len(match_alliance_teams_df)
+
+        match_alliance_teams_df = match_alliance_teams_df.filter(
+            pl.col("team_key").is_in(db.get_team_keys())
+        )
+        logger.info(
+            f"Removed {len(match_alliance_teams_df) - original_match_alliance_teams_df_length} ghost teams"
+        )
+
         logger.info(
             f"Upserting {len(match_alliance_teams_df)} match alliance teams to database"
         )
