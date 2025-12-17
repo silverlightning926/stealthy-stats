@@ -112,10 +112,18 @@ class DBService:
                     c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
                 }
 
-                upsert_stmt = stmt.on_conflict_do_update(
-                    index_elements=conflict_keys,
-                    set_=update_cols,
-                )
+                if not update_cols:
+                    self.logger.debug(
+                        f"No columns to update in '{table_name}' (junction table)"
+                    )
+                    upsert_stmt = stmt.on_conflict_do_nothing(
+                        index_elements=conflict_keys
+                    )
+                else:
+                    upsert_stmt = stmt.on_conflict_do_update(
+                        index_elements=conflict_keys,
+                        set_=update_cols,
+                    )
 
                 session.exec(upsert_stmt)
                 self.logger.info(
