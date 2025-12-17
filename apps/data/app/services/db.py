@@ -8,7 +8,14 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import MetaData, NullPool, Table
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlmodel import Session, SQLModel, create_engine, select
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.models import ETag  # noqa: F401
 from app.models.tba import (  # noqa: F401
@@ -77,6 +84,12 @@ class DBService:
             session.close()
             self.logger.debug("Database session closed")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((OperationalError, InterfaceError)),
+        reraise=True,
+    )
     def upsert(
         self,
         df: pl.DataFrame,
@@ -151,6 +164,12 @@ class DBService:
             self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((OperationalError, InterfaceError)),
+        reraise=True,
+    )
     def upsert_etag(self, endpoint: str, etag: str):
         self.logger.debug(f"Upserting ETag for endpoint: {endpoint}")
 
