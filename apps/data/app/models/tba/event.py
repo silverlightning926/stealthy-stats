@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ARRAY, String
-from sqlmodel import Column, Field, Relationship, SQLModel
+from sqlalchemy import ARRAY, Column, DateTime, String, func
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance, AllianceTeam
@@ -32,6 +32,27 @@ class EventDistrict(SQLModel, table=True):
         description="District display name.",
     )
 
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
+    )
+
     events: list["Event"] = Relationship(
         back_populates="district",
     )
@@ -53,6 +74,27 @@ class EventTeam(SQLModel, table=True):
         index=True,
         description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event: "Event" = Relationship(
@@ -218,6 +260,27 @@ class Event(SQLModel, table=True):
         default=None,
         sa_column=Column(ARRAY(String)),
         description="Division event keys (for championship events).",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     district: "EventDistrict" = Relationship(

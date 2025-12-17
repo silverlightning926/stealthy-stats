@@ -1,5 +1,7 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -57,6 +59,27 @@ class Team(SQLModel, table=True):
         index=True,
         ge=1992,
         description="Year the team first competed.",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event_participations: list["EventTeam"] = Relationship(

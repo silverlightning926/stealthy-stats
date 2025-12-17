@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint
+from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -56,6 +56,27 @@ class MatchAllianceTeam(SQLModel, table=True):
         description="Whether team was disqualified.",
     )
 
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
+    )
+
     match: "Match" = Relationship(
         back_populates="alliance_teams",
     )
@@ -97,6 +118,27 @@ class MatchAlliance(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON),
         description="Detailed year-specific score breakdown.",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     match: "Match" = Relationship(
@@ -165,6 +207,27 @@ class Match(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True)),
         description="Time when results were posted.",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event: "Event" = Relationship(

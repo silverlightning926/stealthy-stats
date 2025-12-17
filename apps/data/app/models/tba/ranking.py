@@ -1,7 +1,8 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKeyConstraint
-from sqlmodel import Column, Field, Relationship, SQLModel
+from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, func
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .event import Event, EventTeam
@@ -36,6 +37,27 @@ class RankingEventInfo(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON),
         description="Metadata for year-specific sort_orders values.",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event: "Event" = Relationship(
@@ -108,6 +130,27 @@ class Ranking(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON),
         description="Year-specific ranking values (see RankingEventInfo.sort_order_info).",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event: "Event" = Relationship(

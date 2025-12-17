@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKeyConstraint
+from sqlalchemy import Column, DateTime, ForeignKeyConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -43,6 +44,27 @@ class AllianceTeam(SQLModel, table=True):
         default=None,
         ge=1,
         description="Pick order (1=captain, 2=first pick).",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     alliance: "Alliance" = Relationship(
@@ -151,6 +173,27 @@ class Alliance(SQLModel, table=True):
     advanced_to_round_robin_finals: bool | None = Field(
         default=None,
         description="Whether alliance advanced to round robin finals.",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
     )
 
     event: "Event" = Relationship(
