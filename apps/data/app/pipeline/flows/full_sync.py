@@ -1,6 +1,6 @@
 from prefect import flow, get_run_logger
 
-from app.pipeline.tasks.tba import (
+from app.pipeline.tasks import (
     sync_alliances,
     sync_event_teams,
     sync_events,
