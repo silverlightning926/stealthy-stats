@@ -1,10 +1,7 @@
 from time import sleep
 
-import polars as pl
 from prefect import get_run_logger, task
-from pydantic import TypeAdapter
 
-from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 
@@ -22,8 +19,7 @@ def sync_teams():
     tba = TBAService()
     db = DBService()
 
-    teams_list: list[pl.DataFrame] = []
-    etags_list: list[dict[str, str]] = []
+    total_teams = 0
 
     # Upper bound for safety - loop breaks when empty page is reached
     for page_num in range(0, 50):
@@ -45,35 +41,20 @@ def sync_teams():
             break
 
         logger.debug(f"Retrieved {len(page_teams_df)} teams from page {page_num}")
-        teams_list.append(page_teams_df)
-
-        if etag:
-            etags_list.append({"endpoint": etag_key, "etag": etag})
-
-        sleep(2.0)
-
-    if teams_list:
-        teams_df = pl.concat(teams_list)
-        logger.info(f"Upserting {len(teams_df)} teams to database")
 
         db.upsert(
-            teams_df,
+            page_teams_df,
             table_name="teams",
             conflict_key="key",
         )
-        logger.info("Successfully synced teams")
-    else:
-        logger.info("No new team data to sync")
+        total_teams += len(page_teams_df)
+        logger.info(f"Upserted {len(page_teams_df)} teams from page {page_num}")
 
-    if etags_list:
-        TypeAdapter(list[ETag]).validate_python(etags_list)
-        etags_df = pl.DataFrame(etags_list)
+        if etag:
+            db.upsert_etag(endpoint=etag_key, etag=etag)
 
-        db.upsert(
-            etags_df,
-            table_name="etags",
-            conflict_key="endpoint",
-        )
-        logger.debug(f"Updated {len(etags_list)} ETag(s)")
+        sleep(2.0)
+
+    logger.info(f"Successfully synced {total_teams} teams")
 
     logger.info("Team sync completed successfully")

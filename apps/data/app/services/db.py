@@ -151,6 +151,28 @@ class DBService:
             self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
             raise
 
+    def upsert_etag(self, endpoint: str, etag: str):
+        self.logger.debug(f"Upserting ETag for endpoint: {endpoint}")
+
+        try:
+            with self.get_session() as session:
+                metadata = MetaData()
+                table = Table("etags", metadata, autoload_with=self.engine)
+
+                stmt = insert(table).values({"endpoint": endpoint, "etag": etag})
+                upsert_stmt = stmt.on_conflict_do_update(
+                    index_elements=["endpoint"],
+                    set_={"etag": stmt.excluded.etag},
+                )
+
+                session.exec(upsert_stmt)
+                self.logger.debug(
+                    f"Successfully upserted ETag for endpoint '{endpoint}'"
+                )
+        except Exception as e:
+            self.logger.error(f"Error upserting ETag for endpoint '{endpoint}': {e}")
+            raise
+
     def get_team_keys(self) -> set[str]:
         self.logger.debug("Retrieving team keys")
 

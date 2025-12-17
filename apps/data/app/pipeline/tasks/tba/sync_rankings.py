@@ -2,9 +2,7 @@ from time import sleep
 
 import polars as pl
 from prefect import get_run_logger, task
-from pydantic import TypeAdapter
 
-from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
@@ -26,12 +24,11 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
-    rankings_list: list[pl.DataFrame] = []
-    ranking_event_infos_list: list[pl.DataFrame] = []
-    etags_list: list[dict[str, str]] = []
-
     event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
+
+    total_rankings = 0
+    total_ranking_event_infos = 0
 
     for event_key in event_keys:
         etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)
@@ -50,58 +47,49 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
         logger.debug(
             f"Retrieved {len(event_rankings_df)} rankings and {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
         )
-        rankings_list.append(event_rankings_df)
-        ranking_event_infos_list.append(event_ranking_event_info_df)
+
+        if not event_ranking_event_info_df.is_empty():
+            db.upsert(
+                event_ranking_event_info_df,
+                table_name="ranking_event_infos",
+                conflict_key="event_key",
+            )
+            total_ranking_event_infos += len(event_ranking_event_info_df)
+            logger.info(
+                f"Upserted {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
+            )
+
+        if not event_rankings_df.is_empty():
+            original_length = len(event_rankings_df)
+            event_rankings_df = event_rankings_df.filter(
+                pl.col("team_key").is_in(db.get_team_keys())
+            )
+
+            removed_count = original_length - len(event_rankings_df)
+            if removed_count > 0:
+                logger.debug(
+                    f"Removed {removed_count} ghost teams for event {event_key}"
+                )
+
+            if not event_rankings_df.is_empty():
+                db.upsert(
+                    event_rankings_df,
+                    table_name="rankings",
+                    conflict_key=["event_key", "team_key"],
+                )
+                total_rankings += len(event_rankings_df)
+                logger.info(
+                    f"Upserted {len(event_rankings_df)} rankings for event {event_key}"
+                )
 
         if etag:
-            etags_list.append({"endpoint": etag_key, "etag": etag})
+            db.upsert_etag(endpoint=etag_key, etag=etag)
 
         sleep(3.0)
 
-    if ranking_event_infos_list:
-        ranking_event_infos_df = pl.concat(ranking_event_infos_list)
-        logger.info(
-            f"Upserting {len(ranking_event_infos_df)} ranking event info records to database"
-        )
-
-        db.upsert(
-            ranking_event_infos_df,
-            table_name="ranking_event_infos",
-            conflict_key="event_key",
-        )
-        logger.info("Successfully synced ranking event info")
-    else:
-        logger.info("No new ranking event info data to sync")
-
-    if rankings_list:
-        rankings_df = pl.concat(rankings_list)
-        original_rankings_df_length = len(rankings_df)
-
-        rankings_df = rankings_df.filter(pl.col("team_key").is_in(db.get_team_keys()))
-        logger.info(
-            f"Removed {len(rankings_df) - original_rankings_df_length} ghost teams"
-        )
-
-        logger.info(f"Upserting {len(rankings_df)} rankings to database")
-
-        db.upsert(
-            rankings_df,
-            table_name="rankings",
-            conflict_key=["event_key", "team_key"],
-        )
-        logger.info("Successfully synced rankings")
-    else:
-        logger.info("No new ranking data to sync")
-
-    if etags_list:
-        TypeAdapter(list[ETag]).validate_python(etags_list)
-        etags_df = pl.DataFrame(etags_list)
-
-        db.upsert(
-            etags_df,
-            table_name="etags",
-            conflict_key="endpoint",
-        )
-        logger.debug(f"Updated {len(etags_list)} ETag(s)")
+    logger.info(
+        f"Successfully synced {total_ranking_event_infos} ranking event info records"
+    )
+    logger.info(f"Successfully synced {total_rankings} rankings")
 
     logger.info(f"Rankings sync completed successfully (sync_type={sync_type.value})")

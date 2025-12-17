@@ -2,9 +2,7 @@ from time import sleep
 
 import polars as pl
 from prefect import get_run_logger, task
-from pydantic import TypeAdapter
 
-from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
@@ -26,11 +24,10 @@ def sync_event_teams(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
-    event_teams_list: list[pl.DataFrame] = []
-    etags_list: list[dict[str, str]] = []
-
     event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
+
+    total_event_teams = 0
 
     for event_key in event_keys:
         etag_key = _TBAEndpoint.EVENT_TEAMS.build(event_key=event_key)
@@ -47,45 +44,36 @@ def sync_event_teams(sync_type: SyncType = SyncType.FULL):
         event_teams_df, etag = result
 
         logger.debug(f"Retrieved {len(event_teams_df)} teams for event {event_key}")
-        event_teams_list.append(event_teams_df)
+
+        if not event_teams_df.is_empty():
+            original_length = len(event_teams_df)
+            event_teams_df = event_teams_df.filter(
+                pl.col("team_key").is_in(db.get_team_keys())
+            )
+
+            removed_count = original_length - len(event_teams_df)
+            if removed_count > 0:
+                logger.debug(
+                    f"Removed {removed_count} ghost teams for event {event_key}"
+                )
+
+            if not event_teams_df.is_empty():
+                db.upsert(
+                    event_teams_df,
+                    table_name="event_teams",
+                    conflict_key=["event_key", "team_key"],
+                )
+                total_event_teams += len(event_teams_df)
+                logger.info(
+                    f"Upserted {len(event_teams_df)} event teams for event {event_key}"
+                )
 
         if etag:
-            etags_list.append({"endpoint": etag_key, "etag": etag})
+            db.upsert_etag(endpoint=etag_key, etag=etag)
 
         sleep(3.0)
 
-    if event_teams_list:
-        event_teams_df = pl.concat(event_teams_list)
-        original_event_teams_df_length = len(event_teams_df)
-
-        event_teams_df = event_teams_df.filter(
-            pl.col("team_key").is_in(db.get_team_keys())
-        )
-        logger.info(
-            f"Removed {len(event_teams_df) - original_event_teams_df_length} ghost teams"
-        )
-
-        logger.info(f"Upserting {len(event_teams_df)} event teams to database")
-
-        db.upsert(
-            event_teams_df,
-            table_name="event_teams",
-            conflict_key=["event_key", "team_key"],
-        )
-        logger.info("Successfully synced event teams")
-    else:
-        logger.info("No new event team data to sync")
-
-    if etags_list:
-        TypeAdapter(list[ETag]).validate_python(etags_list)
-        etags_df = pl.DataFrame(etags_list)
-
-        db.upsert(
-            etags_df,
-            table_name="etags",
-            conflict_key="endpoint",
-        )
-        logger.debug(f"Updated {len(etags_list)} ETag(s)")
+    logger.info(f"Successfully synced {total_event_teams} event teams")
 
     logger.info(
         f"Event teams sync completed successfully (sync_type={sync_type.value})"

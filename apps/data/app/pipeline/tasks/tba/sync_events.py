@@ -1,11 +1,8 @@
 from datetime import datetime
 from time import sleep
 
-import polars as pl
 from prefect import get_run_logger, task
-from pydantic import TypeAdapter
 
-from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
@@ -27,10 +24,6 @@ def sync_events(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
-    events_list: list[pl.DataFrame] = []
-    event_districts_list: list[pl.DataFrame] = []
-    etags_list: list[dict[str, str]] = []
-
     if sync_type == SyncType.FULL:
         start_year = 1992
         end_year = datetime.now().year
@@ -42,6 +35,9 @@ def sync_events(sync_type: SyncType = SyncType.FULL):
         end_year = datetime.now().year
 
     logger.info(f"Syncing events from {start_year} to {end_year}")
+
+    total_events = 0
+    total_event_districts = 0
 
     for year in range(start_year, end_year + 1):
         if year == 2021:
@@ -64,49 +60,33 @@ def sync_events(sync_type: SyncType = SyncType.FULL):
         logger.debug(
             f"Retrieved {len(year_events_df)} events and {len(year_event_districts_df)} districts for year {year}"
         )
-        events_list.append(year_events_df)
-        event_districts_list.append(year_event_districts_df)
+
+        if not year_event_districts_df.is_empty():
+            db.upsert(
+                year_event_districts_df,
+                table_name="event_districts",
+                conflict_key="key",
+            )
+            total_event_districts += len(year_event_districts_df)
+            logger.info(
+                f"Upserted {len(year_event_districts_df)} event districts for year {year}"
+            )
+
+        if not year_events_df.is_empty():
+            db.upsert(
+                year_events_df,
+                table_name="events",
+                conflict_key="key",
+            )
+            total_events += len(year_events_df)
+            logger.info(f"Upserted {len(year_events_df)} events for year {year}")
 
         if etag:
-            etags_list.append({"endpoint": etag_key, "etag": etag})
+            db.upsert_etag(endpoint=etag_key, etag=etag)
 
         sleep(2.0)
 
-    if event_districts_list:
-        event_districts_df = pl.concat(event_districts_list)
-        logger.info(f"Upserting {len(event_districts_df)} districts to database")
-
-        db.upsert(
-            event_districts_df,
-            table_name="event_districts",
-            conflict_key="key",
-        )
-        logger.info("Successfully synced event districts")
-    else:
-        logger.info("No new event district data to sync")
-
-    if events_list:
-        events_df = pl.concat(events_list)
-        logger.info(f"Upserting {len(events_df)} events to database")
-
-        db.upsert(
-            events_df,
-            table_name="events",
-            conflict_key="key",
-        )
-        logger.info("Successfully synced events")
-    else:
-        logger.info("No new event data to sync")
-
-    if etags_list:
-        TypeAdapter(list[ETag]).validate_python(etags_list)
-        etags_df = pl.DataFrame(etags_list)
-
-        db.upsert(
-            etags_df,
-            table_name="etags",
-            conflict_key="endpoint",
-        )
-        logger.debug(f"Updated {len(etags_list)} ETag(s)")
+    logger.info(f"Successfully synced {total_event_districts} event districts")
+    logger.info(f"Successfully synced {total_events} events")
 
     logger.info(f"Event sync completed successfully (sync_type={sync_type.value})")

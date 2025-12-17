@@ -2,9 +2,7 @@ from time import sleep
 
 import polars as pl
 from prefect import get_run_logger, task
-from pydantic import TypeAdapter
 
-from app.models import ETag
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
@@ -26,12 +24,11 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
-    alliances_list: list[pl.DataFrame] = []
-    alliance_teams_list: list[pl.DataFrame] = []
-    etags_list: list[dict[str, str]] = []
-
     event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
+
+    total_alliances = 0
+    total_alliance_teams = 0
 
     for event_key in event_keys:
         etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event_key)
@@ -50,58 +47,47 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
         logger.debug(
             f"Retrieved {len(event_alliances_df)} alliances and {len(event_alliance_teams_df)} alliance teams for event {event_key}"
         )
-        alliances_list.append(event_alliances_df)
-        alliance_teams_list.append(event_alliance_teams_df)
+
+        if not event_alliances_df.is_empty():
+            db.upsert(
+                event_alliances_df,
+                table_name="alliances",
+                conflict_key=["event_key", "name"],
+            )
+            total_alliances += len(event_alliances_df)
+            logger.info(
+                f"Upserted {len(event_alliances_df)} alliances for event {event_key}"
+            )
+
+        if not event_alliance_teams_df.is_empty():
+            original_length = len(event_alliance_teams_df)
+            event_alliance_teams_df = event_alliance_teams_df.filter(
+                pl.col("team_key").is_in(db.get_team_keys())
+            )
+
+            removed_count = original_length - len(event_alliance_teams_df)
+            if removed_count > 0:
+                logger.debug(
+                    f"Removed {removed_count} ghost teams for event {event_key}"
+                )
+
+            if not event_alliance_teams_df.is_empty():
+                db.upsert(
+                    event_alliance_teams_df,
+                    table_name="alliance_teams",
+                    conflict_key=["event_key", "alliance_name", "team_key"],
+                )
+                total_alliance_teams += len(event_alliance_teams_df)
+                logger.info(
+                    f"Upserted {len(event_alliance_teams_df)} alliance teams for event {event_key}"
+                )
 
         if etag:
-            etags_list.append({"endpoint": etag_key, "etag": etag})
+            db.upsert_etag(endpoint=etag_key, etag=etag)
 
         sleep(3.0)
 
-    if alliances_list:
-        alliances_df = pl.concat(alliances_list)
-        logger.info(f"Upserting {len(alliances_df)} alliances to database")
-
-        db.upsert(
-            alliances_df,
-            table_name="alliances",
-            conflict_key=["event_key", "name"],
-        )
-        logger.info("Successfully synced alliances")
-    else:
-        logger.info("No new alliance data to sync")
-
-    if alliance_teams_list:
-        alliance_teams_df = pl.concat(alliance_teams_list)
-        original_alliance_teams_df_length = len(alliance_teams_df)
-
-        alliance_teams_df = alliance_teams_df.filter(
-            pl.col("team_key").is_in(db.get_team_keys())
-        )
-        logger.info(
-            f"Removed {len(alliance_teams_df) - original_alliance_teams_df_length} ghost teams"
-        )
-
-        logger.info(f"Upserting {len(alliance_teams_df)} alliance teams to database")
-
-        db.upsert(
-            alliance_teams_df,
-            table_name="alliance_teams",
-            conflict_key=["event_key", "alliance_name", "team_key"],
-        )
-        logger.info("Successfully synced alliance teams")
-    else:
-        logger.info("No new alliance team data to sync")
-
-    if etags_list:
-        TypeAdapter(list[ETag]).validate_python(etags_list)
-        etags_df = pl.DataFrame(etags_list)
-
-        db.upsert(
-            etags_df,
-            table_name="etags",
-            conflict_key="endpoint",
-        )
-        logger.debug(f"Updated {len(etags_list)} ETag(s)")
+    logger.info(f"Successfully synced {total_alliances} alliances")
+    logger.info(f"Successfully synced {total_alliance_teams} alliance teams")
 
     logger.info(f"Alliances sync completed successfully (sync_type={sync_type.value})")
