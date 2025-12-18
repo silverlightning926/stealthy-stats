@@ -38,7 +38,7 @@ def main():
 
     full_sync_deployment = full_sync.to_deployment(
         name="full-sync-deployment",
-        cron="0 0 1,15 * *",  # Midnight on the 1st and 15th of the month
+        cron="0 0 1 * *",  # Midnight on the 1st of the month
     )
 
     year_sync_deployment = year_sync.to_deployment(
@@ -48,7 +48,7 @@ def main():
 
     live_sync_deployment = live_sync.to_deployment(
         name="live-sync-deployment",
-        interval=timedelta(minutes=10),
+        interval=timedelta(minutes=7),
     )
 
     serve(full_sync_deployment, year_sync_deployment, live_sync_deployment)  # type: ignore
