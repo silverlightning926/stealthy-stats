@@ -2,15 +2,15 @@ services:
   prefect-db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: prefect
-      POSTGRES_PASSWORD: prefect
+      POSTGRES_USER: ${PREFECT_DB_USER}
+      POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD}
       POSTGRES_DB: prefect
     volumes:
       - prefect-db:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      test: ["CMD-SHELL", "pg_isready -U ${PREFECT_DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +23,7 @@ services:
     ports:
       - "4200:4200"
     environment:
-      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/prefect
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_UI_SERVE_BASE: /
       PREFECT_LOGGING_LEVEL: DEBUG
@@ -45,6 +45,24 @@ services:
       retries: 3
       start_period: 40s
 
+  data-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DATA_DB_USER}
+      POSTGRES_PASSWORD: ${DATA_DB_PASSWORD}
+      POSTGRES_DB: data
+    volumes:
+      - data-db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATA_DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data-network
+
   data:
     build:
       context: ../..
@@ -54,13 +72,15 @@ services:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
       PREFECT_LOGGING_LEVEL: DEBUG
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${DATA_DB_USER}:${DATA_DB_PASSWORD}@data-db:5432/data
       TBA_API_KEY: ${TBA_API_KEY}
       PYTHONUNBUFFERED: 1
       PREFECT_API_REQUEST_TIMEOUT: 30
     env_file:
       - .env
     depends_on:
+      data-db:
+        condition: service_healthy
       prefect-server:
         condition: service_healthy
     networks:
@@ -72,6 +92,7 @@ services:
 
 volumes:
   prefect-db:
+  data-db:
 
 networks:
   data-network:
