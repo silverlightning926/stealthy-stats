@@ -23,11 +23,15 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
+    valid_team_keys_df = db.get_team_keys()
+    logger.info(f"Loaded {len(valid_team_keys_df)} valid team keys for filtering")
+
     event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
 
     total_rankings = 0
     total_ranking_event_infos = 0
+    total_ghost_teams_filtered = 0
 
     for event_key in event_keys:
         etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)
@@ -46,6 +50,19 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
         logger.debug(
             f"Retrieved {len(event_rankings_df)} rankings and {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
         )
+
+        original_count = len(event_rankings_df)
+        event_rankings_df = event_rankings_df.join(
+            valid_team_keys_df,
+            on="team_key",
+            how="semi",
+        )
+        ghost_count = original_count - len(event_rankings_df)
+        if ghost_count > 0:
+            total_ghost_teams_filtered += ghost_count
+            logger.warning(
+                f"Filtered {ghost_count} ghost team(s) from rankings for event {event_key}"
+            )
 
         if not event_ranking_event_info_df.is_empty():
             db.upsert(
@@ -78,5 +95,7 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
         f"Successfully synced {total_ranking_event_infos} ranking event info records"
     )
     logger.info(f"Successfully synced {total_rankings} rankings")
+    if total_ghost_teams_filtered > 0:
+        logger.warning(f"Total ghost teams filtered: {total_ghost_teams_filtered}")
 
     logger.info(f"Rankings sync completed successfully (sync_type={sync_type.value})")

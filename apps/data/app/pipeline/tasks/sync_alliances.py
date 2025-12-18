@@ -23,11 +23,15 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
     tba = TBAService()
     db = DBService()
 
+    valid_team_keys_df = db.get_team_keys()
+    logger.info(f"Loaded {len(valid_team_keys_df)} valid team keys for filtering")
+
     event_keys = db.get_event_keys(sync_type=sync_type)
     logger.info(f"Found {len(event_keys)} events to process")
 
     total_alliances = 0
     total_alliance_teams = 0
+    total_ghost_teams_filtered = 0
 
     for event_key in event_keys:
         etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event_key)
@@ -46,6 +50,19 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
         logger.debug(
             f"Retrieved {len(event_alliances_df)} alliances and {len(event_alliance_teams_df)} alliance teams for event {event_key}"
         )
+
+        original_count = len(event_alliance_teams_df)
+        event_alliance_teams_df = event_alliance_teams_df.join(
+            valid_team_keys_df,
+            on="team_key",
+            how="semi",
+        )
+        ghost_count = original_count - len(event_alliance_teams_df)
+        if ghost_count > 0:
+            total_ghost_teams_filtered += ghost_count
+            logger.warning(
+                f"Filtered {ghost_count} ghost team(s) from alliance teams for event {event_key}"
+            )
 
         if not event_alliances_df.is_empty():
             db.upsert(
@@ -76,5 +93,7 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
 
     logger.info(f"Successfully synced {total_alliances} alliances")
     logger.info(f"Successfully synced {total_alliance_teams} alliance teams")
+    if total_ghost_teams_filtered > 0:
+        logger.warning(f"Total ghost teams filtered: {total_ghost_teams_filtered}")
 
     logger.info(f"Alliances sync completed successfully (sync_type={sync_type.value})")

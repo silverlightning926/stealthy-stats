@@ -191,6 +191,34 @@ class DBService:
             self.logger.error(f"Error upserting ETag for endpoint '{endpoint}': {e}")
             raise
 
+    def get(self, statement) -> pl.DataFrame:
+        self.logger.debug(f"Executing query: {statement}")
+
+        try:
+            with self.get_session() as session:
+                results = session.exec(statement).all()
+
+                if not results:
+                    self.logger.debug("Query returned no results")
+                    return pl.DataFrame()
+
+                if not hasattr(results[0], "_fields"):
+                    column_name = statement.selected_columns[0].key
+                    return pl.DataFrame({column_name: results})
+
+                return pl.DataFrame([row._asdict() for row in results])
+
+        except Exception as e:
+            self.logger.error(f"Error executing query: {e}")
+            raise
+
+    def get_team_keys(self) -> pl.DataFrame:
+        self.logger.debug("Retrieving all team keys from database")
+
+        team_keys_df = self.get(select(Team.key)).rename({"key": "team_key"})
+        self.logger.info(f"Retrieved {len(team_keys_df)} team keys")
+        return team_keys_df
+
     def _is_event_active(self, event: Event) -> bool:
         buffer = timedelta(days=1, hours=2)
 
