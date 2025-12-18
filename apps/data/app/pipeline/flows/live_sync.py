@@ -2,7 +2,6 @@ from prefect import flow, get_run_logger
 
 from app.pipeline.tasks import (
     sync_alliances,
-    sync_event_teams,
     sync_matches,
     sync_rankings,
 )
@@ -33,16 +32,13 @@ def live_sync():
             f"Found {len(active_events)} active event(s) - proceeding with live sync"
         )
 
-        logger.info("Step 1/4: Syncing event teams for active events")
-        sync_event_teams(sync_type=SyncType.LIVE)
-
-        logger.info("Step 2/4: Syncing matches for active events")
+        logger.info("Step 1/3: Syncing matches for active events")
         sync_matches(sync_type=SyncType.LIVE)
 
-        logger.info("Step 3/4: Syncing rankings for active events")
+        logger.info("Step 2/3: Syncing rankings for active events")
         sync_rankings(sync_type=SyncType.LIVE)
 
-        logger.info("Step 4/4: Syncing alliances for active events")
+        logger.info("Step 3/3: Syncing alliances for active events")
         sync_alliances(sync_type=SyncType.LIVE)
 
         logger.info("Live sync completed successfully")

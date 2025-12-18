@@ -5,7 +5,7 @@ from sqlalchemy import Column, DateTime, ForeignKeyConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .event import Event, EventTeam
+    from .event import Event
     from .team import Team
 
 
@@ -17,14 +17,11 @@ class AllianceTeam(SQLModel, table=True):
             ["event_key", "alliance_name"],
             ["alliances.event_key", "alliances.name"],
         ),
-        ForeignKeyConstraint(
-            ["event_key", "team_key"],
-            ["event_teams.event_key", "event_teams.team_key"],
-        ),
     )
 
     event_key: str = Field(
         primary_key=True,
+        foreign_key="events.key",
         index=True,
         description="TBA event key.",
         regex=r"^\d{4}[a-z0-9]+$",
@@ -35,6 +32,7 @@ class AllianceTeam(SQLModel, table=True):
     )
     team_key: str = Field(
         primary_key=True,
+        foreign_key="teams.key",
         index=True,
         description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
@@ -70,11 +68,11 @@ class AllianceTeam(SQLModel, table=True):
     alliance: "Alliance" = Relationship(
         back_populates="teams",
     )
-    event_team: "EventTeam" = Relationship(
+    event: "Event" = Relationship(
+        back_populates="alliance_teams",
+    )
+    team: "Team" = Relationship(
         back_populates="alliance_participations",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
     )
 
 

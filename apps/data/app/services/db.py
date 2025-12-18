@@ -23,7 +23,6 @@ from app.models.tba import (  # noqa: F401
     AllianceTeam,
     Event,
     EventDistrict,
-    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
@@ -190,19 +189,6 @@ class DBService:
                 )
         except Exception as e:
             self.logger.error(f"Error upserting ETag for endpoint '{endpoint}': {e}")
-            raise
-
-    def get_team_keys(self) -> set[str]:
-        self.logger.debug("Retrieving team keys")
-
-        try:
-            with self.get_session() as session:
-                teams = session.exec(select(Team.key)).all()
-                team_keys = set(teams)
-                self.logger.info(f"Retrieved {len(team_keys)} team key(s)")
-                return team_keys
-        except Exception as e:
-            self.logger.error(f"Error retrieving team keys: {e}")
             raise
 
     def _is_event_active(self, event: Event) -> bool:

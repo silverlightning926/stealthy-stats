@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from .alliance import Alliance, AllianceTeam
     from .match import Match, MatchAllianceTeam
     from .ranking import Ranking, RankingEventInfo
-    from .team import Team
 
 
 class EventDistrict(SQLModel, table=True):
@@ -55,71 +54,6 @@ class EventDistrict(SQLModel, table=True):
 
     events: list["Event"] = Relationship(
         back_populates="district",
-    )
-
-
-class EventTeam(SQLModel, table=True):
-    __tablename__ = "event_teams"  # pyright: ignore[reportAssignmentType]
-
-    event_key: str = Field(
-        primary_key=True,
-        foreign_key="events.key",
-        index=True,
-        description="TBA event key.",
-        regex=r"^\d{4}[a-z0-9]+$",
-    )
-    team_key: str = Field(
-        primary_key=True,
-        foreign_key="teams.key",
-        index=True,
-        description="TBA team key (e.g., 'frc254').",
-        regex=r"^frc\d+$",
-    )
-
-    created_at: datetime = Field(
-        default=None,
-        sa_column=Column(
-            DateTime(timezone=True),
-            server_default=func.now(),
-            nullable=False,
-        ),
-        description="Timestamp when record was created",
-    )
-
-    updated_at: datetime = Field(
-        default=None,
-        sa_column=Column(
-            DateTime(timezone=True),
-            server_default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-        ),
-        description="Timestamp when record was last updated",
-    )
-
-    event: "Event" = Relationship(
-        back_populates="event_teams",
-    )
-    team: "Team" = Relationship(
-        back_populates="event_participations",
-    )
-    ranking: "Ranking" = Relationship(
-        back_populates="event_team",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
-    )
-    alliance_participations: list["AllianceTeam"] = Relationship(
-        back_populates="event_team",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
-    )
-    match_participations: list["MatchAllianceTeam"] = Relationship(
-        back_populates="event_team",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
     )
 
 
@@ -299,9 +233,6 @@ class Event(SQLModel, table=True):
             "foreign_keys": "[Event.parent_event_key]",
         },
     )
-    event_teams: list["EventTeam"] = Relationship(
-        back_populates="event",
-    )
     matches: list["Match"] = Relationship(
         back_populates="event",
     )
@@ -312,5 +243,11 @@ class Event(SQLModel, table=True):
         back_populates="event",
     )
     alliances: list["Alliance"] = Relationship(
+        back_populates="event",
+    )
+    alliance_teams: list["AllianceTeam"] = Relationship(
+        back_populates="event",
+    )
+    match_alliance_teams: list["MatchAllianceTeam"] = Relationship(
         back_populates="event",
     )

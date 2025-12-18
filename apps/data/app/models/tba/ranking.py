@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, func
+from sqlalchemy import JSON, Column, DateTime, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .event import Event, EventTeam
+    from .event import Event
+    from .team import Team
 
 
 class RankingSortOrderInfo(SQLModel):
@@ -67,13 +68,6 @@ class RankingEventInfo(SQLModel, table=True):
 
 class Ranking(SQLModel, table=True):
     __tablename__ = "rankings"  # pyright: ignore[reportAssignmentType]
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["event_key", "team_key"],
-            ["event_teams.event_key", "event_teams.team_key"],
-        ),
-    )
 
     event_key: str = Field(
         primary_key=True,
@@ -156,9 +150,6 @@ class Ranking(SQLModel, table=True):
     event: "Event" = Relationship(
         back_populates="rankings",
     )
-    event_team: "EventTeam" = Relationship(
-        back_populates="ranking",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
+    team: "Team" = Relationship(
+        back_populates="rankings",
     )

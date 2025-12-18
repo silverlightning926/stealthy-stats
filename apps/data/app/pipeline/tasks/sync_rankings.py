@@ -1,6 +1,5 @@
 from time import sleep
 
-import polars as pl
 from prefect import get_run_logger, task
 
 from app.services import DBService, TBAService
@@ -60,27 +59,15 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
             )
 
         if not event_rankings_df.is_empty():
-            original_length = len(event_rankings_df)
-            event_rankings_df = event_rankings_df.filter(
-                pl.col("team_key").is_in(db.get_team_keys())
+            db.upsert(
+                event_rankings_df,
+                table_name="rankings",
+                conflict_key=["event_key", "team_key"],
             )
-
-            removed_count = original_length - len(event_rankings_df)
-            if removed_count > 0:
-                logger.debug(
-                    f"Removed {removed_count} ghost teams for event {event_key}"
-                )
-
-            if not event_rankings_df.is_empty():
-                db.upsert(
-                    event_rankings_df,
-                    table_name="rankings",
-                    conflict_key=["event_key", "team_key"],
-                )
-                total_rankings += len(event_rankings_df)
-                logger.info(
-                    f"Upserted {len(event_rankings_df)} rankings for event {event_key}"
-                )
+            total_rankings += len(event_rankings_df)
+            logger.info(
+                f"Upserted {len(event_rankings_df)} rankings for event {event_key}"
+            )
 
         if etag:
             db.upsert_etag(endpoint=etag_key, etag=etag)

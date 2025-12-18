@@ -3,7 +3,7 @@ from datetime import timedelta
 from prefect import serve
 from sqlalchemy import func, select
 
-from app.models.tba import Alliance, Event, EventTeam, Match, Ranking, Team
+from app.models.tba import Alliance, Event, Match, Ranking, Team
 from app.pipeline.flows import full_sync, live_sync, year_sync
 from app.services import DBService
 
@@ -14,9 +14,6 @@ def main():
         with db.get_session() as session:
             team_count = session.scalar(select(func.count()).select_from(Team))
             event_count = session.scalar(select(func.count()).select_from(Event))
-            event_team_count = session.scalar(
-                select(func.count()).select_from(EventTeam)
-            )
             match_count = session.scalar(select(func.count()).select_from(Match))
             ranking_count = session.scalar(select(func.count()).select_from(Ranking))
             alliance_count = session.scalar(select(func.count()).select_from(Alliance))
@@ -25,7 +22,6 @@ def main():
                 [
                     team_count == 0,
                     event_count == 0,
-                    event_team_count == 0,
                     match_count == 0,
                     ranking_count == 0,
                     alliance_count == 0,

@@ -2,7 +2,6 @@ from prefect import flow, get_run_logger
 
 from app.pipeline.tasks import (
     sync_alliances,
-    sync_event_teams,
     sync_events,
     sync_matches,
     sync_rankings,
@@ -22,19 +21,16 @@ def year_sync():
     logger.info("Starting year sync")
 
     try:
-        logger.info("Step 1/5: Syncing events")
+        logger.info("Step 1/4: Syncing events")
         sync_events(sync_type=SyncType.YEAR)
 
-        logger.info("Step 2/5: Syncing event teams")
-        sync_event_teams(sync_type=SyncType.YEAR)
-
-        logger.info("Step 3/5: Syncing matches")
+        logger.info("Step 2/4: Syncing matches")
         sync_matches(sync_type=SyncType.YEAR)
 
-        logger.info("Step 4/5: Syncing rankings")
+        logger.info("Step 3/4: Syncing rankings")
         sync_rankings(sync_type=SyncType.YEAR)
 
-        logger.info("Step 5/5: Syncing alliances")
+        logger.info("Step 4/4: Syncing alliances")
         sync_alliances(sync_type=SyncType.YEAR)
 
         logger.info("Year sync completed successfully")

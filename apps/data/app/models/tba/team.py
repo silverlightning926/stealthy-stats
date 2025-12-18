@@ -5,8 +5,9 @@ from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .alliance import Alliance
-    from .event import EventTeam
+    from .alliance import Alliance, AllianceTeam
+    from .match import MatchAllianceTeam
+    from .ranking import Ranking
 
 
 class Team(SQLModel, table=True):
@@ -82,7 +83,13 @@ class Team(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event_participations: list["EventTeam"] = Relationship(
+    alliance_participations: list["AllianceTeam"] = Relationship(
+        back_populates="team",
+    )
+    match_participations: list["MatchAllianceTeam"] = Relationship(
+        back_populates="team",
+    )
+    rankings: list["Ranking"] = Relationship(
         back_populates="team",
     )
     alliances_backup_in: list["Alliance"] = Relationship(
