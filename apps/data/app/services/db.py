@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -87,47 +88,78 @@ class DBService:
         retry=retry_if_exception_type((OperationalError, InterfaceError)),
         reraise=True,
     )
+    def _upsert(
+        self,
+        session: Session,
+        df: pl.DataFrame,
+        table_name: str,
+        conflict_key: str | list[str] | None = None,
+    ):
+        if df.is_empty():
+            logger.debug(f"No records to upsert into {table_name}")
+            return
+
+        logger.info(f"Upserting {len(df)} records into {table_name}")
+
+        records = df.to_dicts()
+
+        metadata = MetaData()
+        table = Table(table_name, metadata, autoload_with=self.engine)
+
+        stmt = insert(table).values(records)
+
+        if conflict_key is None:
+            conflict_keys = [col.name for col in table.primary_key.columns]
+        else:
+            conflict_keys = (
+                [conflict_key] if isinstance(conflict_key, str) else conflict_key
+            )
+
+        update_cols = {
+            c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
+        }
+
+        if not update_cols:
+            upsert_stmt = stmt.on_conflict_do_nothing(index_elements=conflict_keys)
+        else:
+            upsert_stmt = stmt.on_conflict_do_update(
+                index_elements=conflict_keys,
+                set_=update_cols,
+            )
+
+        session.exec(upsert_stmt)
+        logger.debug(f"Successfully upserted records into {table_name}")
+
     def upsert(
         self,
         df: pl.DataFrame,
         table_name: str,
         conflict_key: str | list[str] | None = None,
     ):
+        logger.info(f"Starting single upsert to {table_name}")
+
         with self.get_session() as session:
-            records = df.to_dicts()
+            self._upsert(session, df, table_name, conflict_key)
 
-            if not records:
-                logger.debug(f"No records to upsert into {table_name}")
-                return
+        logger.debug(f"Successfully completed upsert to {table_name}")
 
-            logger.info(f"Upserting {len(records)} records into {table_name}")
+    def upsert_many(
+        self,
+        upserts: Sequence[tuple[pl.DataFrame, str, str | list[str] | None]],
+    ):
+        if not upserts:
+            logger.debug("No upserts to perform")
+            return
 
-            metadata = MetaData()
-            table = Table(table_name, metadata, autoload_with=self.engine)
+        logger.info(f"Starting batch upsert of {len(upserts)} dataframes")
 
-            stmt = insert(table).values(records)
+        with self.get_session() as session:
+            for df, table_name, conflict_key in upserts:
+                self._upsert(session, df, table_name, conflict_key)
 
-            if conflict_key is None:
-                conflict_keys = [col.name for col in table.primary_key.columns]
-            else:
-                conflict_keys = (
-                    [conflict_key] if isinstance(conflict_key, str) else conflict_key
-                )
-
-            update_cols = {
-                c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
-            }
-
-            if not update_cols:
-                upsert_stmt = stmt.on_conflict_do_nothing(index_elements=conflict_keys)
-            else:
-                upsert_stmt = stmt.on_conflict_do_update(
-                    index_elements=conflict_keys,
-                    set_=update_cols,
-                )
-
-            session.exec(upsert_stmt)
-            logger.debug(f"Successfully upserted records into {table_name}")
+        logger.debug(
+            f"Successfully completed batch upsert of {len(upserts)} dataframes"
+        )
 
     def get_etags(self, endpoint: _TBAEndpoint) -> dict[str, str]:
         pattern = re.sub(r"\{[^}]+\}", "%", endpoint.value)

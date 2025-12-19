@@ -26,6 +26,8 @@ def sync_matches(sync_type: SyncType = SyncType.FULL):
     logger.info(f"Syncing matches for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
+        logger.debug(f"[{idx}/{len(event_keys)}] Processing {event_key}")
+
         etag_key = _TBAEndpoint.MATCHES.build(event_key=event_key)
         result = tba.get_matches(
             event_key=event_key,
@@ -40,38 +42,44 @@ def sync_matches(sync_type: SyncType = SyncType.FULL):
             continue
 
         matches_df, match_alliances_df, match_alliance_teams_df, etag = result
-        logger.debug(
-            f"[{idx}/{len(event_keys)}] Retrieved {len(matches_df)} matches, {len(match_alliances_df)} match alliances, {len(match_alliance_teams_df)} match alliance teams for {event_key}"
-        )
 
         match_alliance_teams_df = match_alliance_teams_df.filter(
             pl.col("team_key").is_in(valid_team_keys)
         )
 
+        upserts = []
+
         if not matches_df.is_empty():
-            db.upsert(matches_df, table_name="matches", conflict_key="key")
+            upserts.append((matches_df, "matches", "key"))
 
         if not match_alliances_df.is_empty():
-            db.upsert(
-                match_alliances_df,
-                table_name="match_alliances",
-                conflict_key=["match_key", "alliance_color"],
+            upserts.append(
+                (
+                    match_alliances_df,
+                    "match_alliances",
+                    ["match_key", "alliance_color"],
+                )
             )
 
         if not match_alliance_teams_df.is_empty():
-            db.upsert(
-                match_alliance_teams_df,
-                table_name="match_alliance_teams",
-                conflict_key=["match_key", "alliance_color", "team_key"],
+            upserts.append(
+                (
+                    match_alliance_teams_df,
+                    "match_alliance_teams",
+                    ["match_key", "alliance_color", "team_key"],
+                )
             )
 
         if etag:
             etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
-            db.upsert(
-                etag_df,
-                table_name="etags",
-                conflict_key=["endpoint"],
+            upserts.append((etag_df, "etags", ["endpoint"]))
+
+        if upserts:
+            logger.info(
+                f"[{idx}/{len(event_keys)}] {event_key}: "
+                f"{len(matches_df)} matches, {len(match_alliance_teams_df)} teams"
             )
+            db.upsert_many(upserts)
 
         sleep(0.5)
 

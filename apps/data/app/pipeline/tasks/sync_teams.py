@@ -26,6 +26,8 @@ def sync_teams():
     logger.info(f"Syncing teams (max {max_pages} pages)")
 
     while page_num < max_pages:
+        logger.debug(f"[Page {page_num}] Processing teams")
+
         etag_key = _TBAEndpoint.TEAMS.build(page=str(page_num))
         result = tba.get_teams(
             page=page_num,
@@ -44,17 +46,16 @@ def sync_teams():
             logger.info(f"Reached end of teams at page {page_num}")
             break
 
-        logger.debug(f"[Page {page_num}/{max_pages}] Retrieved {len(teams_df)} teams")
+        upserts = []
 
-        db.upsert(teams_df, table_name="teams", conflict_key="key")
+        upserts.append((teams_df, "teams", "key"))
 
         if etag:
             etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
-            db.upsert(
-                etag_df,
-                table_name="etags",
-                conflict_key=["endpoint"],
-            )
+            upserts.append((etag_df, "etags", ["endpoint"]))
+
+        logger.info(f"[Page {page_num}] {len(teams_df)} teams")
+        db.upsert_many(upserts)
 
         page_num += 1
         sleep(0.5)

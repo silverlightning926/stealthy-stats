@@ -26,6 +26,8 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
     logger.info(f"Syncing alliances for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
+        logger.debug(f"[{idx}/{len(event_keys)}] Processing {event_key}")
+
         etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event_key)
         result = tba.get_alliances(
             event_key=event_key,
@@ -40,35 +42,35 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
             continue
 
         alliances_df, alliance_teams_df, etag = result
-        logger.debug(
-            f"[{idx}/{len(event_keys)}] Retrieved {len(alliances_df)} alliances, {len(alliance_teams_df)} alliance teams for {event_key}"
-        )
 
         alliance_teams_df = alliance_teams_df.filter(
             pl.col("team_key").is_in(valid_team_keys)
         )
 
+        upserts = []
+
         if not alliances_df.is_empty():
-            db.upsert(
-                alliances_df,
-                table_name="alliances",
-                conflict_key=["event_key", "name"],
-            )
+            upserts.append((alliances_df, "alliances", ["event_key", "name"]))
 
         if not alliance_teams_df.is_empty():
-            db.upsert(
-                alliance_teams_df,
-                table_name="alliance_teams",
-                conflict_key=["event_key", "alliance_name", "team_key"],
+            upserts.append(
+                (
+                    alliance_teams_df,
+                    "alliance_teams",
+                    ["event_key", "alliance_name", "team_key"],
+                )
             )
 
         if etag:
             etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
-            db.upsert(
-                etag_df,
-                table_name="etags",
-                conflict_key=["endpoint"],
+            upserts.append((etag_df, "etags", ["endpoint"]))
+
+        if upserts:
+            logger.info(
+                f"[{idx}/{len(event_keys)}] {event_key}: "
+                f"{len(alliances_df)} alliances, {len(alliance_teams_df)} teams"
             )
+            db.upsert_many(upserts)
 
         sleep(0.5)
 

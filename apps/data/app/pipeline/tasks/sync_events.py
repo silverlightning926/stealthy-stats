@@ -39,6 +39,8 @@ def sync_events(sync_type: SyncType = SyncType.FULL):
             continue
 
         year_count += 1
+        logger.debug(f"[{year_count}/{total_years}] Processing year {year}")
+
         etag_key = _TBAEndpoint.EVENTS.build(year=str(year))
         result = tba.get_events(
             year=year,
@@ -53,25 +55,25 @@ def sync_events(sync_type: SyncType = SyncType.FULL):
             continue
 
         events_df, event_districts_df, etag = result
-        logger.debug(
-            f"[{year_count}/{total_years}] Retrieved {len(events_df)} events, {len(event_districts_df)} event districts for year {year}"
-        )
+
+        upserts = []
 
         if not event_districts_df.is_empty():
-            db.upsert(
-                event_districts_df, table_name="event_districts", conflict_key="key"
-            )
+            upserts.append((event_districts_df, "event_districts", "key"))
 
         if not events_df.is_empty():
-            db.upsert(events_df, table_name="events", conflict_key="key")
+            upserts.append((events_df, "events", "key"))
 
         if etag:
             etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
-            db.upsert(
-                etag_df,
-                table_name="etags",
-                conflict_key=["endpoint"],
+            upserts.append((etag_df, "etags", ["endpoint"]))
+
+        if upserts:
+            logger.info(
+                f"[{year_count}/{total_years}] Year {year}: "
+                f"{len(events_df)} events, {len(event_districts_df)} districts"
             )
+            db.upsert_many(upserts)
 
         sleep(0.5)
 

@@ -26,6 +26,8 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
     logger.info(f"Syncing rankings for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
+        logger.debug(f"[{idx}/{len(event_keys)}] Processing {event_key}")
+
         etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)
         result = tba.get_rankings(
             event_key=event_key,
@@ -40,33 +42,38 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
             continue
 
         rankings_df, ranking_event_info_df, etag = result
-        logger.debug(
-            f"[{idx}/{len(event_keys)}] Retrieved {len(rankings_df)} rankings, {len(ranking_event_info_df)} ranking event info for {event_key}"
-        )
 
         rankings_df = rankings_df.filter(pl.col("team_key").is_in(valid_team_keys))
 
+        upserts = []
+
         if not ranking_event_info_df.is_empty():
-            db.upsert(
-                ranking_event_info_df,
-                table_name="ranking_event_infos",
-                conflict_key="event_key",
+            upserts.append(
+                (
+                    ranking_event_info_df,
+                    "ranking_event_infos",
+                    "event_key",
+                )
             )
 
         if not rankings_df.is_empty():
-            db.upsert(
-                rankings_df,
-                table_name="rankings",
-                conflict_key=["event_key", "team_key"],
+            upserts.append(
+                (
+                    rankings_df,
+                    "rankings",
+                    ["event_key", "team_key"],
+                )
             )
 
         if etag:
             etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
-            db.upsert(
-                etag_df,
-                table_name="etags",
-                conflict_key=["endpoint"],
+            upserts.append((etag_df, "etags", ["endpoint"]))
+
+        if upserts:
+            logger.info(
+                f"[{idx}/{len(event_keys)}] {event_key}: {len(rankings_df)} rankings"
             )
+            db.upsert_many(upserts)
 
         sleep(0.5)
 
