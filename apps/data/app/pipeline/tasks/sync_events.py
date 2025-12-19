@@ -4,7 +4,7 @@ from time import sleep
 import polars as pl
 from prefect import task
 
-from app.services import DBService, TBAService
+from app.services import db, tba
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
 from app.utils.batch_accumulator import BatchAccumulator
@@ -17,8 +17,6 @@ from app.utils.batch_accumulator import BatchAccumulator
     retry_delay_seconds=10,
 )
 def sync_events(sync_type: SyncType = SyncType.FULL, batch_size: int = 5):
-    tba = TBAService()
-    db = DBService()
     accumulator = BatchAccumulator(batch_size=batch_size)
 
     current_year = datetime.now().year

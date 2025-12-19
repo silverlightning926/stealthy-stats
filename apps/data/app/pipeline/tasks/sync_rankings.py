@@ -3,7 +3,7 @@ from time import sleep
 import polars as pl
 from prefect import task
 
-from app.services import DBService, TBAService
+from app.services import db, tba
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
 from app.utils.batch_accumulator import BatchAccumulator
@@ -16,8 +16,6 @@ from app.utils.batch_accumulator import BatchAccumulator
     retry_delay_seconds=10,
 )
 def sync_rankings(sync_type: SyncType = SyncType.FULL, batch_size: int = 50):
-    tba = TBAService()
-    db = DBService()
     accumulator = BatchAccumulator(batch_size=batch_size)
 
     event_keys = db.get_event_keys(sync_type=sync_type)

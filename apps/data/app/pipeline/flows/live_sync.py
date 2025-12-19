@@ -5,7 +5,7 @@ from app.pipeline.tasks import (
     sync_matches,
     sync_rankings,
 )
-from app.services import DBService
+from app.services import db
 from app.types import SyncType
 
 
@@ -16,8 +16,6 @@ from app.types import SyncType
     retry_delay_seconds=30,
 )
 def live_sync():
-    db = DBService()
-
     active_events = db.get_event_keys(sync_type=SyncType.LIVE)
     if not active_events:
         return
