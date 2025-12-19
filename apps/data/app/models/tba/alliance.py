@@ -91,6 +91,12 @@ class Alliance(SQLModel, table=True):
         primary_key=True,
         description="Alliance identifier (e.g., 'Alliance 1').",
     )
+    order: int | None = Field(
+        default=None,
+        ge=1,
+        index=True,
+        description="Numeric order for 'Alliance N' pattern, null for division names.",
+    )
 
     backup_in: str | None = Field(
         default=None,

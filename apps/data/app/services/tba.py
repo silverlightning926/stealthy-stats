@@ -564,6 +564,11 @@ class TBAService:
 
         data, etag = response
 
+        if data:
+            for idx, alliance in enumerate(data, start=1):
+                if "name" not in alliance or alliance["name"] is None:
+                    alliance["name"] = f"Alliance {idx}"
+
         alliances_raw_df = (
             pl.from_dicts(
                 data,
@@ -604,6 +609,10 @@ class TBAService:
                 },
             )
             .with_columns(
+                pl.col("name")
+                .str.extract(r"^Alliance (\d+)$", 1)
+                .cast(pl.Int32, strict=False)
+                .alias("order"),
                 pl.col("backup").struct.field("in").alias("backup_in"),
                 pl.col("backup").struct.field("out").alias("backup_out"),
                 pl.lit(event_key).alias("event_key"),
@@ -654,6 +663,7 @@ class TBAService:
         alliances_df = alliances_raw_df.select(
             "event_key",
             "name",
+            "order",
             "backup_in",
             "backup_out",
             "status",
