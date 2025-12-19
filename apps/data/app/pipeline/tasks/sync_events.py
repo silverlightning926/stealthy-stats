@@ -80,8 +80,8 @@ def sync_events(sync_type: SyncType = SyncType.FULL, batch_size: int = 5):
                 db.upsert(combined, table_name="events", conflict_key="key")
                 accumulator.clear_data("events")
 
-            if accumulator.etag_updates:
-                combined = pl.DataFrame(accumulator.etag_updates)
+            if accumulator.has_etags():
+                combined = pl.DataFrame(accumulator.get_etags())
                 db.upsert(
                     combined,
                     table_name="etags",
@@ -103,8 +103,8 @@ def sync_events(sync_type: SyncType = SyncType.FULL, batch_size: int = 5):
             combined = pl.concat(accumulator.get_data("events"))
             db.upsert(combined, table_name="events", conflict_key="key")
 
-        if accumulator.etag_updates:
-            combined = pl.DataFrame(accumulator.etag_updates)
+        if accumulator.has_etags():
+            combined = pl.DataFrame(accumulator.get_etags())
             db.upsert(
                 combined,
                 table_name="etags",

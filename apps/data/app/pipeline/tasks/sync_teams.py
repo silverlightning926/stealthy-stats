@@ -63,8 +63,8 @@ def sync_teams(batch_size: int = 5):
                 db.upsert(combined, table_name="teams", conflict_key="key")
                 accumulator.clear_data("teams")
 
-            if accumulator.etag_updates:
-                combined = pl.DataFrame(accumulator.etag_updates)
+            if accumulator.has_etags():
+                combined = pl.DataFrame(accumulator.get_etags())
                 db.upsert(
                     combined,
                     table_name="etags",
@@ -82,8 +82,8 @@ def sync_teams(batch_size: int = 5):
             combined = pl.concat(accumulator.get_data("teams"))
             db.upsert(combined, table_name="teams", conflict_key="key")
 
-        if accumulator.etag_updates:
-            combined = pl.DataFrame(accumulator.etag_updates)
+        if accumulator.has_etags():
+            combined = pl.DataFrame(accumulator.get_etags())
             db.upsert(
                 combined,
                 table_name="etags",

@@ -85,8 +85,8 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
                 )
                 accumulator.clear_data("match_alliance_teams")
 
-            if accumulator.etag_updates:
-                combined = pl.DataFrame(accumulator.etag_updates)
+            if accumulator.has_etags():
+                combined = pl.DataFrame(accumulator.get_etags())
                 db.upsert(
                     combined,
                     table_name="etags",
@@ -120,8 +120,8 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
                 conflict_key=["match_key", "alliance_color", "team_key"],
             )
 
-        if accumulator.etag_updates:
-            combined = pl.DataFrame(accumulator.etag_updates)
+        if accumulator.has_etags():
+            combined = pl.DataFrame(accumulator.get_etags())
             db.upsert(
                 combined,
                 table_name="etags",

@@ -77,8 +77,8 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL, batch_size: int = 50):
                 )
                 accumulator.clear_data("rankings")
 
-            if accumulator.etag_updates:
-                combined = pl.DataFrame(accumulator.etag_updates)
+            if accumulator.has_etags():
+                combined = pl.DataFrame(accumulator.get_etags())
                 db.upsert(
                     combined,
                     table_name="etags",
@@ -108,8 +108,8 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL, batch_size: int = 50):
                 conflict_key=["event_key", "team_key"],
             )
 
-        if accumulator.etag_updates:
-            combined = pl.DataFrame(accumulator.etag_updates)
+        if accumulator.has_etags():
+            combined = pl.DataFrame(accumulator.get_etags())
             db.upsert(
                 combined,
                 table_name="etags",
