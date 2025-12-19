@@ -247,6 +247,7 @@ class Event(SQLModel, table=True):
     )
     alliance_teams: list["AllianceTeam"] = Relationship(
         back_populates="event",
+        sa_relationship_kwargs={"overlaps": "alliance,teams"},
     )
     match_alliance_teams: list["MatchAllianceTeam"] = Relationship(
         back_populates="event",

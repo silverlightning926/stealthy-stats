@@ -67,9 +67,11 @@ class AllianceTeam(SQLModel, table=True):
 
     alliance: "Alliance" = Relationship(
         back_populates="teams",
+        sa_relationship_kwargs={"overlaps": "event"},
     )
     event: "Event" = Relationship(
         back_populates="alliance_teams",
+        sa_relationship_kwargs={"overlaps": "alliance"},
     )
     team: "Team" = Relationship(
         back_populates="alliance_participations",
@@ -199,6 +201,7 @@ class Alliance(SQLModel, table=True):
     )
     teams: list["AllianceTeam"] = Relationship(
         back_populates="alliance",
+        sa_relationship_kwargs={"overlaps": "event"},
     )
     team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",
