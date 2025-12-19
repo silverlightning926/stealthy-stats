@@ -93,15 +93,18 @@ class Ranking(SQLModel, table=True):
         description="Number of qualification matches played.",
     )
 
-    wins: int = Field(
+    wins: int | None = Field(
+        default=None,
         ge=0,
         description="Number of qualification wins.",
     )
-    losses: int = Field(
+    losses: int | None = Field(
+        default=None,
         ge=0,
         description="Number of qualification losses.",
     )
-    ties: int = Field(
+    ties: int | None = Field(
+        default=None,
         ge=0,
         description="Number of qualification ties.",
     )

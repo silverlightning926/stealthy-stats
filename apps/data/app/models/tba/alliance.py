@@ -39,7 +39,6 @@ class AllianceTeam(SQLModel, table=True):
     )
 
     pick_order: int = Field(
-        default=None,
         ge=1,
         description="Pick order (1=captain, 2=first pick).",
     )
