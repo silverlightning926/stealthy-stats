@@ -6,7 +6,6 @@ from prefect.logging import get_run_logger
 
 from app.services import db, tba
 from app.services.tba import _TBAEndpoint
-from app.utils.batch_accumulator import BatchAccumulator
 
 
 @task(
@@ -15,11 +14,9 @@ from app.utils.batch_accumulator import BatchAccumulator
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_teams(batch_size: int = 5):
+def sync_teams():
     logger = get_run_logger()
-    logger.info(f"Starting team sync with batch_size={batch_size}")
-
-    accumulator = BatchAccumulator(batch_size=batch_size)
+    logger.info("Starting team sync")
 
     page_num = 0
     max_pages = 50
@@ -49,45 +46,17 @@ def sync_teams(batch_size: int = 5):
 
         logger.debug(f"[Page {page_num}/{max_pages}] Retrieved {len(teams_df)} teams")
 
-        accumulator.add_data("teams", teams_df)
+        db.upsert(teams_df, table_name="teams", conflict_key="key")
+
         if etag:
-            accumulator.add_etag(etag_key, etag)
-
-        page_num += 1
-
-        if accumulator.should_flush(page_num, max_pages):
-            logger.info(f"[Page {page_num}/{max_pages}] Flushing batch to database")
-
-            if accumulator.get_data("teams"):
-                combined = pl.concat(accumulator.get_data("teams"))
-                db.upsert(combined, table_name="teams", conflict_key="key")
-                accumulator.clear_data("teams")
-
-            if accumulator.has_etags():
-                combined = pl.DataFrame(accumulator.get_etags())
-                db.upsert(
-                    combined,
-                    table_name="etags",
-                    conflict_key=["endpoint"],
-                )
-
-                accumulator.clear_etags()
-
-        sleep(0.5)
-
-    if accumulator.has_data():
-        logger.info("Flushing final batch to database")
-
-        if accumulator.get_data("teams"):
-            combined = pl.concat(accumulator.get_data("teams"))
-            db.upsert(combined, table_name="teams", conflict_key="key")
-
-        if accumulator.has_etags():
-            combined = pl.DataFrame(accumulator.get_etags())
+            etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
             db.upsert(
-                combined,
+                etag_df,
                 table_name="etags",
                 conflict_key=["endpoint"],
             )
+
+        page_num += 1
+        sleep(0.5)
 
     logger.info(f"Team sync completed successfully (processed {page_num} pages)")

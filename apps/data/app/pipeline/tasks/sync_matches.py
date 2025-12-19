@@ -7,7 +7,6 @@ from prefect.logging import get_run_logger
 from app.services import db, tba
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
-from app.utils.batch_accumulator import BatchAccumulator
 
 
 @task(
@@ -16,13 +15,9 @@ from app.utils.batch_accumulator import BatchAccumulator
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
+def sync_matches(sync_type: SyncType = SyncType.FULL):
     logger = get_run_logger()
-    logger.info(
-        f"Starting match sync with sync_type={sync_type.value}, batch_size={batch_size}"
-    )
-
-    accumulator = BatchAccumulator(batch_size=batch_size)
+    logger.info(f"Starting match sync with sync_type={sync_type.value}")
 
     event_keys = db.get_event_keys(sync_type=sync_type)
     etags = db.get_etags(_TBAEndpoint.MATCHES)
@@ -53,79 +48,31 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
             pl.col("team_key").is_in(valid_team_keys)
         )
 
-        accumulator.add_data("matches", matches_df)
-        accumulator.add_data("match_alliances", match_alliances_df)
-        accumulator.add_data("match_alliance_teams", match_alliance_teams_df)
-        if etag:
-            accumulator.add_etag(etag_key, etag)
+        if not matches_df.is_empty():
+            db.upsert(matches_df, table_name="matches", conflict_key="key")
 
-        if accumulator.should_flush(idx, len(event_keys)):
-            logger.info(f"[{idx}/{len(event_keys)}] Flushing batch to database")
-
-            if accumulator.get_data("matches"):
-                combined = pl.concat(accumulator.get_data("matches"))
-                db.upsert(combined, table_name="matches", conflict_key="key")
-                accumulator.clear_data("matches")
-
-            if accumulator.get_data("match_alliances"):
-                combined = pl.concat(accumulator.get_data("match_alliances"))
-                db.upsert(
-                    combined,
-                    table_name="match_alliances",
-                    conflict_key=["match_key", "alliance_color"],
-                )
-                accumulator.clear_data("match_alliances")
-
-            if accumulator.get_data("match_alliance_teams"):
-                combined = pl.concat(accumulator.get_data("match_alliance_teams"))
-                db.upsert(
-                    combined,
-                    table_name="match_alliance_teams",
-                    conflict_key=["match_key", "alliance_color", "team_key"],
-                )
-                accumulator.clear_data("match_alliance_teams")
-
-            if accumulator.has_etags():
-                combined = pl.DataFrame(accumulator.get_etags())
-                db.upsert(
-                    combined,
-                    table_name="etags",
-                    conflict_key=["endpoint"],
-                )
-
-                accumulator.clear_etags()
-
-        sleep(0.5)
-
-    if accumulator.has_data():
-        logger.info("Flushing final batch to database")
-
-        if accumulator.get_data("matches"):
-            combined = pl.concat(accumulator.get_data("matches"))
-            db.upsert(combined, table_name="matches", conflict_key="key")
-
-        if accumulator.get_data("match_alliances"):
-            combined = pl.concat(accumulator.get_data("match_alliances"))
+        if not match_alliances_df.is_empty():
             db.upsert(
-                combined,
+                match_alliances_df,
                 table_name="match_alliances",
                 conflict_key=["match_key", "alliance_color"],
             )
 
-        if accumulator.get_data("match_alliance_teams"):
-            combined = pl.concat(accumulator.get_data("match_alliance_teams"))
+        if not match_alliance_teams_df.is_empty():
             db.upsert(
-                combined,
+                match_alliance_teams_df,
                 table_name="match_alliance_teams",
                 conflict_key=["match_key", "alliance_color", "team_key"],
             )
 
-        if accumulator.has_etags():
-            combined = pl.DataFrame(accumulator.get_etags())
+        if etag:
+            etag_df = pl.DataFrame([{"endpoint": etag_key, "etag": etag}])
             db.upsert(
-                combined,
+                etag_df,
                 table_name="etags",
                 conflict_key=["endpoint"],
             )
+
+        sleep(0.5)
 
     logger.info("Match sync completed successfully")
