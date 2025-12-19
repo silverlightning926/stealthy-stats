@@ -1,10 +1,12 @@
 from time import sleep
 
-from prefect import get_run_logger, task
+import polars as pl
+from prefect import task
 
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
+from app.utils.batch_accumulator import BatchAccumulator
 
 
 @task(
@@ -13,89 +15,87 @@ from app.types import SyncType
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_rankings(sync_type: SyncType = SyncType.FULL):
-    logger = get_run_logger()
-
-    logger.info(
-        f"Starting rankings sync from The Blue Alliance (sync_type={sync_type.value})"
-    )
-
+def sync_rankings(sync_type: SyncType = SyncType.FULL, batch_size: int = 50):
     tba = TBAService()
     db = DBService()
-
-    valid_team_keys_df = db.get_team_keys()
-    logger.info(f"Loaded {len(valid_team_keys_df)} valid team keys for filtering")
+    accumulator = BatchAccumulator(batch_size=batch_size)
 
     event_keys = db.get_event_keys(sync_type=sync_type)
-    logger.info(f"Found {len(event_keys)} events to process")
+    etags = db.get_etags(_TBAEndpoint.RANKINGS)
+    valid_team_keys = db.get_team_keys()
 
-    total_rankings = 0
-    total_ranking_event_infos = 0
-    total_ghost_teams_filtered = 0
-
-    for event_key in event_keys:
+    for idx, event_key in enumerate(event_keys, start=1):
         etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)
-
         result = tba.get_rankings(
             event_key=event_key,
-            etag=db.get_etag(endpoint=etag_key),
+            etag=etags.get(etag_key),
         )
 
-        if result is None:  # ETag cache hit
-            logger.debug(f"Cache hit for event {event_key}")
+        if result is None:
+            sleep(0.5)
             continue
 
-        event_rankings_df, event_ranking_event_info_df, etag = result
+        rankings_df, ranking_event_info_df, etag = result
 
-        logger.debug(
-            f"Retrieved {len(event_rankings_df)} rankings and {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
-        )
+        rankings_df = rankings_df.filter(pl.col("team_key").is_in(valid_team_keys))
 
-        original_count = len(event_rankings_df)
-        event_rankings_df = event_rankings_df.join(
-            valid_team_keys_df,
-            on="team_key",
-            how="semi",
-        )
-        ghost_count = original_count - len(event_rankings_df)
-        if ghost_count > 0:
-            total_ghost_teams_filtered += ghost_count
-            logger.warning(
-                f"Filtered {ghost_count} ghost team(s) from rankings for event {event_key}"
-            )
+        accumulator.add_data("rankings", rankings_df)
+        accumulator.add_data("ranking_event_infos", ranking_event_info_df)
+        if etag:
+            accumulator.add_etag(etag_key, etag)
 
-        if not event_ranking_event_info_df.is_empty():
+        if accumulator.should_flush(idx, len(event_keys)):
+            if accumulator.get_data("ranking_event_infos"):
+                combined = pl.concat(accumulator.get_data("ranking_event_infos"))
+                db.upsert(
+                    combined,
+                    table_name="ranking_event_infos",
+                    conflict_key="event_key",
+                )
+                accumulator.clear_data("ranking_event_infos")
+
+            if accumulator.get_data("rankings"):
+                combined = pl.concat(accumulator.get_data("rankings"))
+                db.upsert(
+                    combined,
+                    table_name="rankings",
+                    conflict_key=["event_key", "team_key"],
+                )
+                accumulator.clear_data("rankings")
+
+            if accumulator.etag_updates:
+                combined = pl.DataFrame(accumulator.etag_updates)
+                db.upsert(
+                    combined,
+                    table_name="etags",
+                    conflict_key=["endpoint"],
+                )
+
+                accumulator.clear_etags()
+
+        sleep(0.5)
+
+    if accumulator.has_data():
+        if accumulator.get_data("ranking_event_infos"):
+            combined = pl.concat(accumulator.get_data("ranking_event_infos"))
             db.upsert(
-                event_ranking_event_info_df,
+                combined,
                 table_name="ranking_event_infos",
                 conflict_key="event_key",
             )
-            total_ranking_event_infos += len(event_ranking_event_info_df)
-            logger.info(
-                f"Upserted {len(event_ranking_event_info_df)} ranking event info record for event {event_key}"
-            )
 
-        if not event_rankings_df.is_empty():
+        if accumulator.get_data("rankings"):
+            combined = pl.concat(accumulator.get_data("rankings"))
             db.upsert(
-                event_rankings_df,
+                combined,
                 table_name="rankings",
                 conflict_key=["event_key", "team_key"],
             )
-            total_rankings += len(event_rankings_df)
-            logger.info(
-                f"Upserted {len(event_rankings_df)} rankings for event {event_key}"
+
+        if accumulator.etag_updates:
+            combined = pl.DataFrame(accumulator.etag_updates)
+            db.upsert(
+                combined,
+                table_name="etags",
+                conflict_key=["endpoint"],
             )
-
-        if etag:
-            db.upsert_etag(endpoint=etag_key, etag=etag)
-
-        sleep(3.0)
-
-    logger.info(
-        f"Successfully synced {total_ranking_event_infos} ranking event info records"
-    )
-    logger.info(f"Successfully synced {total_rankings} rankings")
-    if total_ghost_teams_filtered > 0:
-        logger.warning(f"Total ghost teams filtered: {total_ghost_teams_filtered}")
-
-    logger.info(f"Rankings sync completed successfully (sync_type={sync_type.value})")

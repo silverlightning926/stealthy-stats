@@ -1,4 +1,5 @@
 import logging
+import re
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -32,6 +33,8 @@ from app.models.tba import (  # noqa: F401
     Team,
 )
 from app.types import SyncType
+
+from .tba import _TBAEndpoint
 
 
 class _DBConfig(BaseSettings):
@@ -145,79 +148,45 @@ class DBService:
                 self.logger.error(f"Failed to upsert records into '{table_name}': {e}")
                 raise
 
-    def get_etag(self, endpoint: str) -> str | None:
-        self.logger.debug(f"Retrieving ETag for endpoint: {endpoint}")
+    def get_etags(self, endpoint: _TBAEndpoint) -> dict[str, str]:
+        self.logger.debug(
+            f"Retrieving all ETags for endpoint pattern: {endpoint.value}"
+        )
 
         try:
+            pattern = re.sub(r"\{[^}]+\}", "%", endpoint.value)
+
             with self.get_session() as session:
-                existing_etag = session.get(ETag, endpoint)
-                if existing_etag:
-                    self.logger.debug(
-                        f"Found ETag for endpoint '{endpoint}': {existing_etag.etag}"
+                results = session.exec(
+                    select(ETag.endpoint, ETag.etag).where(
+                        ETag.endpoint.like(pattern)  # pyright: ignore[reportAttributeAccessIssue]
                     )
-                    return existing_etag.etag
-                else:
-                    self.logger.debug(f"No ETag found for endpoint '{endpoint}'")
-                    return None
+                ).all()
+
+                etags = {endpoint: etag for endpoint, etag in results}
+
+                self.logger.debug(f"Found {len(etags)} ETags for pattern '{pattern}'")
+
+                return etags
+
         except Exception as e:
-            self.logger.error(f"Error retrieving ETag for endpoint '{endpoint}': {e}")
+            self.logger.error(
+                f"Error retrieving ETags for endpoint pattern '{endpoint.value}': {e}"
+            )
             raise
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((OperationalError, InterfaceError)),
-        reraise=True,
-    )
-    def upsert_etag(self, endpoint: str, etag: str):
-        self.logger.debug(f"Upserting ETag for endpoint: {endpoint}")
+    def get_team_keys(self) -> set[str]:
+        self.logger.debug("Retrieving team keys")
 
         try:
             with self.get_session() as session:
-                metadata = MetaData()
-                table = Table("etags", metadata, autoload_with=self.engine)
-
-                stmt = insert(table).values({"endpoint": endpoint, "etag": etag})
-                upsert_stmt = stmt.on_conflict_do_update(
-                    index_elements=["endpoint"],
-                    set_={"etag": stmt.excluded.etag},
-                )
-
-                session.exec(upsert_stmt)
-                self.logger.debug(
-                    f"Successfully upserted ETag for endpoint '{endpoint}'"
-                )
+                teams = session.exec(select(Team.key)).all()
+                team_keys = set(teams)
+                self.logger.info(f"Retrieved {len(team_keys)} team key(s)")
+                return team_keys
         except Exception as e:
-            self.logger.error(f"Error upserting ETag for endpoint '{endpoint}': {e}")
+            self.logger.error(f"Error retrieving team keys: {e}")
             raise
-
-    def get(self, statement) -> pl.DataFrame:
-        self.logger.debug(f"Executing query: {statement}")
-
-        try:
-            with self.get_session() as session:
-                results = session.exec(statement).all()
-
-                if not results:
-                    self.logger.debug("Query returned no results")
-                    return pl.DataFrame()
-
-                if not hasattr(results[0], "_fields"):
-                    column_name = statement.selected_columns[0].key
-                    return pl.DataFrame({column_name: results})
-
-                return pl.DataFrame([row._asdict() for row in results])
-
-        except Exception as e:
-            self.logger.error(f"Error executing query: {e}")
-            raise
-
-    def get_team_keys(self) -> pl.DataFrame:
-        self.logger.debug("Retrieving all team keys from database")
-
-        team_keys_df = self.get(select(Team.key)).rename({"key": "team_key"})
-        self.logger.info(f"Retrieved {len(team_keys_df)} team keys")
-        return team_keys_df
 
     def _is_event_active(self, event: Event) -> bool:
         buffer = timedelta(days=1, hours=2)

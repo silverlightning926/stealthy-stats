@@ -1,10 +1,12 @@
 from time import sleep
 
-from prefect import get_run_logger, task
+import polars as pl
+from prefect import task
 
 from app.services import DBService, TBAService
 from app.services.tba import _TBAEndpoint
 from app.types import SyncType
+from app.utils.batch_accumulator import BatchAccumulator
 
 
 @task(
@@ -13,108 +15,99 @@ from app.types import SyncType
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_matches(sync_type: SyncType = SyncType.FULL):
-    logger = get_run_logger()
-
-    logger.info(
-        f"Starting match sync from The Blue Alliance (sync_type={sync_type.value})"
-    )
-
+def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
     tba = TBAService()
     db = DBService()
-
-    valid_team_keys_df = db.get_team_keys()
-    logger.info(f"Loaded {len(valid_team_keys_df)} valid team keys for filtering")
+    accumulator = BatchAccumulator(batch_size=batch_size)
 
     event_keys = db.get_event_keys(sync_type=sync_type)
-    logger.info(f"Found {len(event_keys)} events to process")
+    etags = db.get_etags(_TBAEndpoint.MATCHES)
+    valid_team_keys = db.get_team_keys()
 
-    total_matches = 0
-    total_match_alliances = 0
-    total_match_alliance_teams = 0
-    total_ghost_teams_filtered = 0
-
-    for event_key in event_keys:
+    for idx, event_key in enumerate(event_keys, start=1):
         etag_key = _TBAEndpoint.MATCHES.build(event_key=event_key)
-
         result = tba.get_matches(
             event_key=event_key,
-            etag=db.get_etag(endpoint=etag_key),
+            etag=etags.get(etag_key),
         )
 
-        if result is None:  # ETag cache hit
-            logger.debug(f"Cache hit for event {event_key}")
+        if result is None:
+            sleep(0.5)
             continue
 
-        (
-            event_matches_df,
-            event_match_alliances_df,
-            event_match_alliance_teams_df,
-            etag,
-        ) = result
+        matches_df, match_alliances_df, match_alliance_teams_df, etag = result
 
-        logger.debug(
-            f"Retrieved {len(event_matches_df)} matches, {len(event_match_alliances_df)} match alliances, "
-            f"and {len(event_match_alliance_teams_df)} match alliance teams for event {event_key}"
+        match_alliance_teams_df = match_alliance_teams_df.filter(
+            pl.col("team_key").is_in(valid_team_keys)
         )
 
-        original_count = len(event_match_alliance_teams_df)
-        event_match_alliance_teams_df = event_match_alliance_teams_df.join(
-            valid_team_keys_df,
-            on="team_key",
-            how="semi",
-        )
-        ghost_count = original_count - len(event_match_alliance_teams_df)
-        if ghost_count > 0:
-            total_ghost_teams_filtered += ghost_count
-            logger.warning(
-                f"Filtered {ghost_count} ghost team(s) from match alliance teams for event {event_key}"
-            )
+        accumulator.add_data("matches", matches_df)
+        accumulator.add_data("match_alliances", match_alliances_df)
+        accumulator.add_data("match_alliance_teams", match_alliance_teams_df)
+        if etag:
+            accumulator.add_etag(etag_key, etag)
 
-        if not event_matches_df.is_empty():
-            db.upsert(
-                event_matches_df,
-                table_name="matches",
-                conflict_key="key",
-            )
-            total_matches += len(event_matches_df)
-            logger.info(
-                f"Upserted {len(event_matches_df)} matches for event {event_key}"
-            )
+        if accumulator.should_flush(idx, len(event_keys)):
+            if accumulator.get_data("matches"):
+                combined = pl.concat(accumulator.get_data("matches"))
+                db.upsert(combined, table_name="matches", conflict_key="key")
+                accumulator.clear_data("matches")
 
-        if not event_match_alliances_df.is_empty():
+            if accumulator.get_data("match_alliances"):
+                combined = pl.concat(accumulator.get_data("match_alliances"))
+                db.upsert(
+                    combined,
+                    table_name="match_alliances",
+                    conflict_key=["match_key", "alliance_color"],
+                )
+                accumulator.clear_data("match_alliances")
+
+            if accumulator.get_data("match_alliance_teams"):
+                combined = pl.concat(accumulator.get_data("match_alliance_teams"))
+                db.upsert(
+                    combined,
+                    table_name="match_alliance_teams",
+                    conflict_key=["match_key", "alliance_color", "team_key"],
+                )
+                accumulator.clear_data("match_alliance_teams")
+
+            if accumulator.etag_updates:
+                combined = pl.DataFrame(accumulator.etag_updates)
+                db.upsert(
+                    combined,
+                    table_name="etags",
+                    conflict_key=["endpoint"],
+                )
+
+                accumulator.clear_etags()
+
+        sleep(0.5)
+
+    if accumulator.has_data():
+        if accumulator.get_data("matches"):
+            combined = pl.concat(accumulator.get_data("matches"))
+            db.upsert(combined, table_name="matches", conflict_key="key")
+
+        if accumulator.get_data("match_alliances"):
+            combined = pl.concat(accumulator.get_data("match_alliances"))
             db.upsert(
-                event_match_alliances_df,
+                combined,
                 table_name="match_alliances",
                 conflict_key=["match_key", "alliance_color"],
             )
-            total_match_alliances += len(event_match_alliances_df)
-            logger.info(
-                f"Upserted {len(event_match_alliances_df)} match alliances for event {event_key}"
-            )
 
-        if not event_match_alliance_teams_df.is_empty():
+        if accumulator.get_data("match_alliance_teams"):
+            combined = pl.concat(accumulator.get_data("match_alliance_teams"))
             db.upsert(
-                event_match_alliance_teams_df,
+                combined,
                 table_name="match_alliance_teams",
                 conflict_key=["match_key", "alliance_color", "team_key"],
             )
-            total_match_alliance_teams += len(event_match_alliance_teams_df)
-            logger.info(
-                f"Upserted {len(event_match_alliance_teams_df)} match alliance teams for event {event_key}"
+
+        if accumulator.etag_updates:
+            combined = pl.DataFrame(accumulator.etag_updates)
+            db.upsert(
+                combined,
+                table_name="etags",
+                conflict_key=["endpoint"],
             )
-
-        if etag:
-            db.upsert_etag(endpoint=etag_key, etag=etag)
-
-        sleep(3.0)
-
-    logger.info(f"Successfully synced {total_matches} matches")
-    logger.info(f"Successfully synced {total_match_alliances} match alliances")
-    logger.info(
-        f"Successfully synced {total_match_alliance_teams} match alliance teams"
-    )
-    if total_ghost_teams_filtered > 0:
-        logger.warning(f"Total ghost teams filtered: {total_ghost_teams_filtered}")
-
-    logger.info(f"Match sync completed successfully (sync_type={sync_type.value})")
