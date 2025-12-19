@@ -1,6 +1,8 @@
 services:
   prefect-db:
     image: postgres:17-alpine
+    env_file:
+      - ../../.env
     environment:
       POSTGRES_USER: ${PREFECT_DB_USER}
       POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD}
@@ -8,7 +10,7 @@ services:
     volumes:
       - prefect-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PREFECT_DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${PREFECT_DB_USER} -d prefect"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -18,6 +20,8 @@ services:
   prefect-server:
     image: prefecthq/prefect:3-latest
     command: prefect server start --host 0.0.0.0
+    env_file:
+      - ../../.env
     ports:
       - "4200:4200"
     environment:
@@ -44,6 +48,8 @@ services:
 
   data-db:
     image: postgres:17-alpine
+    env_file:
+      - ../../.env
     environment:
       POSTGRES_USER: ${DATA_DB_USER}
       POSTGRES_PASSWORD: ${DATA_DB_PASSWORD}
@@ -51,7 +57,7 @@ services:
     volumes:
       - data-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATA_DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATA_DB_USER} -d data"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -60,13 +66,13 @@ services:
 
   data:
     image: ghcr.io/silverlightning926/stealthy-stats/data:latest
+    env_file:
+      - ../../.env
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*
       DATABASE_URL: postgresql://${DATA_DB_USER}:${DATA_DB_PASSWORD}@data-db:5432/data
       TBA_API_KEY: ${TBA_API_KEY}
-    env_file:
-      - .env
     depends_on:
       data-db:
         condition: service_healthy
