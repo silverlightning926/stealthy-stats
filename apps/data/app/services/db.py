@@ -1,3 +1,4 @@
+import logging
 import re
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -35,6 +36,8 @@ from app.types import SyncType
 
 from .tba import _TBAEndpoint
 
+logger = logging.getLogger(__name__)
+
 
 class _DBConfig(BaseSettings):
     model_config = SettingsConfigDict(
@@ -48,6 +51,7 @@ class _DBConfig(BaseSettings):
 
 class DBService:
     def __init__(self):
+        logger.info("Initializing database service")
         self.config = _DBConfig()  # pyright: ignore[reportCallIssue]
 
         self.engine = create_engine(
@@ -61,6 +65,7 @@ class DBService:
         )
 
         SQLModel.metadata.create_all(self.engine)
+        logger.info("Database service initialized successfully")
 
     @contextmanager
     def get_session(self):
@@ -68,8 +73,10 @@ class DBService:
         try:
             yield session
             session.commit()
-        except Exception:
+            logger.debug("Session committed successfully")
+        except Exception as e:
             session.rollback()
+            logger.error(f"Session rollback due to error: {e}")
             raise
         finally:
             session.close()
@@ -90,7 +97,10 @@ class DBService:
             records = df.to_dicts()
 
             if not records:
+                logger.debug(f"No records to upsert into {table_name}")
                 return
+
+            logger.info(f"Upserting {len(records)} records into {table_name}")
 
             metadata = MetaData()
             table = Table(table_name, metadata, autoload_with=self.engine)
@@ -117,9 +127,11 @@ class DBService:
                 )
 
             session.exec(upsert_stmt)
+            logger.debug(f"Successfully upserted records into {table_name}")
 
     def get_etags(self, endpoint: _TBAEndpoint) -> dict[str, str]:
         pattern = re.sub(r"\{[^}]+\}", "%", endpoint.value)
+        logger.debug(f"Fetching etags for endpoint pattern: {pattern}")
 
         with self.get_session() as session:
             results = session.exec(
@@ -129,13 +141,16 @@ class DBService:
             ).all()
 
             etags = {endpoint: etag for endpoint, etag in results}
+            logger.info(f"Retrieved {len(etags)} etags for {endpoint.name}")
 
             return etags
 
     def get_team_keys(self) -> set[str]:
+        logger.debug("Fetching team keys from database")
         with self.get_session() as session:
             teams = session.exec(select(Team.key)).all()
             team_keys = set(teams)
+            logger.info(f"Retrieved {len(team_keys)} team keys")
             return team_keys
 
     def _is_event_active(self, event: Event) -> bool:
@@ -150,6 +165,7 @@ class DBService:
         return event_start_with_buffer <= now_in_event_tz <= event_end_with_buffer
 
     def get_event_keys(self, sync_type: SyncType = SyncType.FULL) -> list[str]:
+        logger.info(f"Fetching event keys for sync type: {sync_type.value}")
         with self.get_session() as session:
             if sync_type == SyncType.FULL:
                 # All inactive events, all years
@@ -184,4 +200,5 @@ class DBService:
                     event.key for event in events if not self._is_event_active(event)
                 ]
 
+            logger.info(f"Found {len(keys)} event keys for {sync_type.value} sync")
             return keys

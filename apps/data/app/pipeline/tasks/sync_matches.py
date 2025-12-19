@@ -2,6 +2,7 @@ from time import sleep
 
 import polars as pl
 from prefect import task
+from prefect.logging import get_run_logger
 
 from app.services import db, tba
 from app.services.tba import _TBAEndpoint
@@ -16,11 +17,18 @@ from app.utils.batch_accumulator import BatchAccumulator
     retry_delay_seconds=10,
 )
 def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
+    logger = get_run_logger()
+    logger.info(
+        f"Starting match sync with sync_type={sync_type.value}, batch_size={batch_size}"
+    )
+
     accumulator = BatchAccumulator(batch_size=batch_size)
 
     event_keys = db.get_event_keys(sync_type=sync_type)
     etags = db.get_etags(_TBAEndpoint.MATCHES)
     valid_team_keys = db.get_team_keys()
+
+    logger.info(f"Syncing matches for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
         etag_key = _TBAEndpoint.MATCHES.build(event_key=event_key)
@@ -30,10 +38,16 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
         )
 
         if result is None:
+            logger.debug(
+                f"[{idx}/{len(event_keys)}] No updates for {event_key} (cached)"
+            )
             sleep(0.5)
             continue
 
         matches_df, match_alliances_df, match_alliance_teams_df, etag = result
+        logger.debug(
+            f"[{idx}/{len(event_keys)}] Retrieved {len(matches_df)} matches, {len(match_alliances_df)} match alliances, {len(match_alliance_teams_df)} match alliance teams for {event_key}"
+        )
 
         match_alliance_teams_df = match_alliance_teams_df.filter(
             pl.col("team_key").is_in(valid_team_keys)
@@ -46,6 +60,8 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
             accumulator.add_etag(etag_key, etag)
 
         if accumulator.should_flush(idx, len(event_keys)):
+            logger.info(f"[{idx}/{len(event_keys)}] Flushing batch to database")
+
             if accumulator.get_data("matches"):
                 combined = pl.concat(accumulator.get_data("matches"))
                 db.upsert(combined, table_name="matches", conflict_key="key")
@@ -82,6 +98,8 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
         sleep(0.5)
 
     if accumulator.has_data():
+        logger.info("Flushing final batch to database")
+
         if accumulator.get_data("matches"):
             combined = pl.concat(accumulator.get_data("matches"))
             db.upsert(combined, table_name="matches", conflict_key="key")
@@ -109,3 +127,5 @@ def sync_matches(sync_type: SyncType = SyncType.FULL, batch_size: int = 25):
                 table_name="etags",
                 conflict_key=["endpoint"],
             )
+
+    logger.info("Match sync completed successfully")

@@ -1,3 +1,4 @@
+import logging
 from enum import StrEnum
 from typing import Any
 
@@ -24,6 +25,8 @@ from app.models.tba import (
     RankingEventInfo,
     Team,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _TBAEndpoint(StrEnum):
@@ -52,7 +55,9 @@ class _TBAConfig(BaseSettings):
 
 class TBAService:
     def __init__(self):
+        logger.info("Initializing TBA service")
         self.config = _TBAConfig()  # pyright: ignore[reportCallIssue]
+        logger.info(f"TBA service initialized with base URL: {self.config.base_url}")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -65,6 +70,8 @@ class TBAService:
         if etag is not None:
             headers["If-None-Match"] = etag
 
+        logger.debug(f"Making TBA API request to {endpoint}")
+
         req = httpx.get(
             url=self.config.base_url + endpoint,
             headers=headers,
@@ -72,9 +79,11 @@ class TBAService:
         )
 
         if req.status_code == 304:
+            logger.debug(f"Cached response (304) for {endpoint}")
             return None
 
         req.raise_for_status()
+        logger.debug(f"Successfully retrieved data from {endpoint}")
 
         return (req.json(), req.headers.get("ETag"))
 
@@ -125,6 +134,7 @@ class TBAService:
         )
 
         TypeAdapter(list[Team]).validate_python(teams_df.to_dicts())
+        logger.debug(f"Processed {len(teams_df)} teams from page {page}")
 
         return (teams_df, etag)
 
@@ -243,6 +253,9 @@ class TBAService:
 
         TypeAdapter(list[Event]).validate_python(events_df.to_dicts())
         TypeAdapter(list[EventDistrict]).validate_python(event_districts_df.to_dicts())
+        logger.debug(
+            f"Processed {len(events_df)} events and {len(event_districts_df)} event districts for year {year}"
+        )
 
         return (events_df, event_districts_df, etag)
 
@@ -437,6 +450,9 @@ class TBAService:
         TypeAdapter(list[MatchAllianceTeam]).validate_python(
             match_alliance_teams_df.to_dicts()
         )
+        logger.debug(
+            f"Processed {len(matches_df)} matches, {len(match_alliances_df)} match alliances, {len(match_alliance_teams_df)} match alliance teams for event {event_key}"
+        )
 
         return (matches_df, match_alliances_df, match_alliance_teams_df, etag)
 
@@ -529,6 +545,9 @@ class TBAService:
 
         TypeAdapter(list[Ranking]).validate_python(rankings_df.to_dicts())
         TypeAdapter(list[RankingEventInfo]).validate_python(ranking_info_df.to_dicts())
+        logger.debug(
+            f"Processed {len(rankings_df)} rankings and {len(ranking_info_df)} ranking info records for event {event_key}"
+        )
 
         return (rankings_df, ranking_info_df, etag)
 
@@ -654,5 +673,8 @@ class TBAService:
 
         TypeAdapter(list[Alliance]).validate_python(alliances_df.to_dicts())
         TypeAdapter(list[AllianceTeam]).validate_python(alliance_teams_df.to_dicts())
+        logger.debug(
+            f"Processed {len(alliances_df)} alliances and {len(alliance_teams_df)} alliance teams for event {event_key}"
+        )
 
         return (alliances_df, alliance_teams_df, etag)
