@@ -1,4 +1,3 @@
-import logging
 import re
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -49,11 +48,8 @@ class _DBConfig(BaseSettings):
 
 class DBService:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
         self.config = _DBConfig()  # pyright: ignore[reportCallIssue]
 
-        self.logger.info("Initializing database connection")
         self.engine = create_engine(
             self.config.db_url.get_secret_value(),
             echo=False,
@@ -64,12 +60,7 @@ class DBService:
             },
         )
 
-        try:
-            SQLModel.metadata.create_all(self.engine)
-            self.logger.info("Database tables created/verified successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to create database tables: {e}")
-            raise
+        SQLModel.metadata.create_all(self.engine)
 
     @contextmanager
     def get_session(self):
@@ -77,14 +68,11 @@ class DBService:
         try:
             yield session
             session.commit()
-            self.logger.debug("Database session committed successfully")
         except Exception as e:
             session.rollback()
-            self.logger.error(f"Database session error, rolling back: {e}")
             raise
         finally:
             session.close()
-            self.logger.debug("Database session closed")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -98,95 +86,57 @@ class DBService:
         table_name: str,
         conflict_key: str | list[str] | None = None,
     ):
-        record_count = len(df)
-        self.logger.info(f"Upserting {record_count} records into table '{table_name}'")
-
         with self.get_session() as session:
             records = df.to_dicts()
 
             if not records:
-                self.logger.warning(f"No records to upsert into '{table_name}'")
                 return
 
-            try:
-                metadata = MetaData()
-                table = Table(table_name, metadata, autoload_with=self.engine)
+            metadata = MetaData()
+            table = Table(table_name, metadata, autoload_with=self.engine)
 
-                stmt = insert(table).values(records)
+            stmt = insert(table).values(records)
 
-                if conflict_key is None:
-                    conflict_keys = [col.name for col in table.primary_key.columns]
-                else:
-                    conflict_keys = (
-                        [conflict_key]
-                        if isinstance(conflict_key, str)
-                        else conflict_key
-                    )
-
-                update_cols = {
-                    c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
-                }
-
-                if not update_cols:
-                    self.logger.debug(
-                        f"No columns to update in '{table_name}' (junction table)"
-                    )
-                    upsert_stmt = stmt.on_conflict_do_nothing(
-                        index_elements=conflict_keys
-                    )
-                else:
-                    upsert_stmt = stmt.on_conflict_do_update(
-                        index_elements=conflict_keys,
-                        set_=update_cols,
-                    )
-
-                session.exec(upsert_stmt)
-                self.logger.info(
-                    f"Successfully upserted {record_count} records into '{table_name}'"
+            if conflict_key is None:
+                conflict_keys = [col.name for col in table.primary_key.columns]
+            else:
+                conflict_keys = (
+                    [conflict_key] if isinstance(conflict_key, str) else conflict_key
                 )
-            except Exception as e:
-                self.logger.error(f"Failed to upsert records into '{table_name}': {e}")
-                raise
+
+            update_cols = {
+                c: stmt.excluded[c] for c in df.columns if c not in conflict_keys
+            }
+
+            if not update_cols:
+                upsert_stmt = stmt.on_conflict_do_nothing(index_elements=conflict_keys)
+            else:
+                upsert_stmt = stmt.on_conflict_do_update(
+                    index_elements=conflict_keys,
+                    set_=update_cols,
+                )
+
+            session.exec(upsert_stmt)
 
     def get_etags(self, endpoint: _TBAEndpoint) -> dict[str, str]:
-        self.logger.debug(
-            f"Retrieving all ETags for endpoint pattern: {endpoint.value}"
-        )
+        pattern = re.sub(r"\{[^}]+\}", "%", endpoint.value)
 
-        try:
-            pattern = re.sub(r"\{[^}]+\}", "%", endpoint.value)
+        with self.get_session() as session:
+            results = session.exec(
+                select(ETag.endpoint, ETag.etag).where(
+                    ETag.endpoint.like(pattern)  # pyright: ignore[reportAttributeAccessIssue]
+                )
+            ).all()
 
-            with self.get_session() as session:
-                results = session.exec(
-                    select(ETag.endpoint, ETag.etag).where(
-                        ETag.endpoint.like(pattern)  # pyright: ignore[reportAttributeAccessIssue]
-                    )
-                ).all()
+            etags = {endpoint: etag for endpoint, etag in results}
 
-                etags = {endpoint: etag for endpoint, etag in results}
-
-                self.logger.debug(f"Found {len(etags)} ETags for pattern '{pattern}'")
-
-                return etags
-
-        except Exception as e:
-            self.logger.error(
-                f"Error retrieving ETags for endpoint pattern '{endpoint.value}': {e}"
-            )
-            raise
+            return etags
 
     def get_team_keys(self) -> set[str]:
-        self.logger.debug("Retrieving team keys")
-
-        try:
-            with self.get_session() as session:
-                teams = session.exec(select(Team.key)).all()
-                team_keys = set(teams)
-                self.logger.info(f"Retrieved {len(team_keys)} team key(s)")
-                return team_keys
-        except Exception as e:
-            self.logger.error(f"Error retrieving team keys: {e}")
-            raise
+        with self.get_session() as session:
+            teams = session.exec(select(Team.key)).all()
+            team_keys = set(teams)
+            return team_keys
 
     def _is_event_active(self, event: Event) -> bool:
         buffer = timedelta(days=1, hours=2)
@@ -200,52 +150,38 @@ class DBService:
         return event_start_with_buffer <= now_in_event_tz <= event_end_with_buffer
 
     def get_event_keys(self, sync_type: SyncType = SyncType.FULL) -> list[str]:
-        self.logger.info(f"Retrieving event keys for {sync_type.value} sync")
+        with self.get_session() as session:
+            if sync_type == SyncType.FULL:
+                # All inactive events, all years
+                events = list(
+                    session.exec(select(Event).order_by(Event.start_date)).all()  # pyright: ignore[reportArgumentType]
+                )
+                keys = [
+                    event.key for event in events if not self._is_event_active(event)
+                ]
 
-        try:
-            with self.get_session() as session:
-                if sync_type == SyncType.FULL:
-                    # All inactive events, all years
-                    events = list(
-                        session.exec(select(Event).order_by(Event.start_date)).all()  # pyright: ignore[reportArgumentType]
-                    )
-                    keys = [
-                        event.key
-                        for event in events
-                        if not self._is_event_active(event)
-                    ]
+            elif sync_type == SyncType.LIVE:
+                # Active events, current year only
+                events = list(
+                    session.exec(
+                        select(Event)
+                        .where(Event.year == datetime.now().year)
+                        .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                    ).all()
+                )
+                keys = [event.key for event in events if self._is_event_active(event)]
 
-                elif sync_type == SyncType.LIVE:
-                    # Active events, current year only
-                    events = list(
-                        session.exec(
-                            select(Event)
-                            .where(Event.year == datetime.now().year)
-                            .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
-                        ).all()
-                    )
-                    keys = [
-                        event.key for event in events if self._is_event_active(event)
-                    ]
+            elif sync_type == SyncType.YEAR:
+                # Inactive events, current year only
+                events = list(
+                    session.exec(
+                        select(Event)
+                        .where(Event.year == datetime.now().year)
+                        .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                    ).all()
+                )
+                keys = [
+                    event.key for event in events if not self._is_event_active(event)
+                ]
 
-                elif sync_type == SyncType.YEAR:
-                    # Inactive events, current year only
-                    events = list(
-                        session.exec(
-                            select(Event)
-                            .where(Event.year == datetime.now().year)
-                            .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
-                        ).all()
-                    )
-                    keys = [
-                        event.key
-                        for event in events
-                        if not self._is_event_active(event)
-                    ]
-
-                self.logger.info(f"Retrieved {len(keys)} event key(s)")
-                return keys
-
-        except Exception as e:
-            self.logger.error(f"Error retrieving event keys: {e}")
-            raise
+            return keys

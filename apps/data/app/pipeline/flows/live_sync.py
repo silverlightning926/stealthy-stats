@@ -1,4 +1,4 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 
 from app.pipeline.tasks import (
     sync_alliances,
@@ -16,33 +16,14 @@ from app.types import SyncType
     retry_delay_seconds=30,
 )
 def live_sync():
-    logger = get_run_logger()
+    db = DBService()
 
-    logger.info("Starting live sync")
+    active_events = db.get_event_keys(sync_type=SyncType.LIVE)
+    if not active_events:
+        return
 
-    try:
-        db = DBService()
+    sync_matches(sync_type=SyncType.LIVE)
 
-        active_events = db.get_event_keys(sync_type=SyncType.LIVE)
-        if not active_events:
-            logger.info("No active events found - skipping live sync")
-            return
+    sync_rankings(sync_type=SyncType.LIVE)
 
-        logger.info(
-            f"Found {len(active_events)} active event(s) - proceeding with live sync"
-        )
-
-        logger.info("Step 1/3: Syncing matches for active events")
-        sync_matches(sync_type=SyncType.LIVE)
-
-        logger.info("Step 2/3: Syncing rankings for active events")
-        sync_rankings(sync_type=SyncType.LIVE)
-
-        logger.info("Step 3/3: Syncing alliances for active events")
-        sync_alliances(sync_type=SyncType.LIVE)
-
-        logger.info("Live sync completed successfully")
-
-    except Exception as e:
-        logger.error(f"Live sync failed with error: {e}")
-        raise
+    sync_alliances(sync_type=SyncType.LIVE)

@@ -1,4 +1,4 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 
 from app.pipeline.tasks import (
     sync_alliances,
@@ -16,25 +16,10 @@ from app.types import SyncType
     retry_delay_seconds=30,
 )
 def year_sync():
-    logger = get_run_logger()
+    sync_events(sync_type=SyncType.YEAR)
 
-    logger.info("Starting year sync")
+    sync_matches(sync_type=SyncType.YEAR)
 
-    try:
-        logger.info("Step 1/4: Syncing events")
-        sync_events(sync_type=SyncType.YEAR)
+    sync_rankings(sync_type=SyncType.YEAR)
 
-        logger.info("Step 2/4: Syncing matches")
-        sync_matches(sync_type=SyncType.YEAR)
-
-        logger.info("Step 3/4: Syncing rankings")
-        sync_rankings(sync_type=SyncType.YEAR)
-
-        logger.info("Step 4/4: Syncing alliances")
-        sync_alliances(sync_type=SyncType.YEAR)
-
-        logger.info("Year sync completed successfully")
-
-    except Exception as e:
-        logger.error(f"Year sync failed with error: {e}")
-        raise
+    sync_alliances(sync_type=SyncType.YEAR)

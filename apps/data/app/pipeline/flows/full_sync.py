@@ -1,4 +1,4 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 
 from app.pipeline.tasks import (
     sync_alliances,
@@ -17,28 +17,12 @@ from app.types import SyncType
     retry_delay_seconds=30,
 )
 def full_sync():
-    logger = get_run_logger()
+    sync_teams()
 
-    logger.info("Starting full sync")
+    sync_events(sync_type=SyncType.FULL)
 
-    try:
-        logger.info("Step 1/5: Syncing teams")
-        sync_teams()
+    sync_matches(sync_type=SyncType.FULL)
 
-        logger.info("Step 2/5: Syncing events")
-        sync_events(sync_type=SyncType.FULL)
+    sync_rankings(sync_type=SyncType.FULL)
 
-        logger.info("Step 3/5: Syncing matches")
-        sync_matches(sync_type=SyncType.FULL)
-
-        logger.info("Step 4/5: Syncing rankings")
-        sync_rankings(sync_type=SyncType.FULL)
-
-        logger.info("Step 5/5: Syncing alliances")
-        sync_alliances(sync_type=SyncType.FULL)
-
-        logger.info("Full sync completed successfully")
-
-    except Exception as e:
-        logger.error(f"Full sync failed with error: {e}")
-        raise
+    sync_alliances(sync_type=SyncType.FULL)
