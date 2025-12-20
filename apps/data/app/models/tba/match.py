@@ -39,13 +39,6 @@ class MatchAllianceTeam(SQLModel, table=True):
         regex=r"^frc\d+$",
     )
 
-    event_key: str = Field(
-        foreign_key="events.key",
-        index=True,
-        description="TBA event key (denormalized from match).",
-        regex=r"^\d{4}[a-z0-9]+$",
-    )
-
     is_surrogate: bool = Field(
         default=False,
         description="Whether team is a surrogate.",
@@ -84,9 +77,6 @@ class MatchAllianceTeam(SQLModel, table=True):
         sa_relationship_kwargs={
             "viewonly": True,
         },
-    )
-    event: "Event" = Relationship(
-        back_populates="match_alliance_teams",
     )
     team: "Team" = Relationship(
         back_populates="match_participations",

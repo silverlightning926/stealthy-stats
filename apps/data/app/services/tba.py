@@ -388,7 +388,6 @@ class TBAService:
                 [
                     "match_key",
                     "alliance_color",
-                    "event_key",
                     "team_keys",
                     "surrogate_team_keys",
                     "dq_team_keys",
@@ -416,7 +415,6 @@ class TBAService:
                     "match_key",
                     "alliance_color",
                     "team_key",
-                    "event_key",
                     "is_surrogate",
                     "is_dq",
                 ]

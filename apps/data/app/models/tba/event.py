@@ -6,7 +6,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance, AllianceTeam
-    from .match import Match, MatchAllianceTeam
+    from .match import Match
     from .ranking import Ranking, RankingEventInfo
 
 
@@ -248,7 +248,4 @@ class Event(SQLModel, table=True):
     alliance_teams: list["AllianceTeam"] = Relationship(
         back_populates="event",
         sa_relationship_kwargs={"overlaps": "alliance,teams"},
-    )
-    match_alliance_teams: list["MatchAllianceTeam"] = Relationship(
-        back_populates="event",
     )
