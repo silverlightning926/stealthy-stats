@@ -39,7 +39,7 @@ def main():
 
     year_sync_deployment = year_sync.to_deployment(
         name="year-sync-deployment",
-        cron="0 0 * * 1,4",  # Midnight on Mondays and Thursdays
+        cron="0 0 * * 3",  # Midnight on Wednesdays
     )
 
     live_sync_deployment = live_sync.to_deployment(

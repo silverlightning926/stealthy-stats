@@ -25,6 +25,7 @@ from app.models.tba import (  # noqa: F401
     AllianceTeam,
     Event,
     EventDistrict,
+    EventTeam,
     Match,
     MatchAlliance,
     MatchAllianceTeam,
@@ -177,13 +178,27 @@ class DBService:
 
             return etags
 
-    def get_team_keys(self) -> set[str]:
-        logger.debug("Fetching team keys from database")
+    def get_event_team_keys(self, event_keys: list[str]) -> dict[str, set[str]]:
+        logger.debug(f"Fetching team keys for {len(event_keys)} events from database")
+
         with self.get_session() as session:
-            teams = session.exec(select(Team.key)).all()
-            team_keys = set(teams)
-            logger.info(f"Retrieved {len(team_keys)} team keys")
-            return team_keys
+            event_teams = session.exec(
+                select(EventTeam.event_key, EventTeam.team_key).where(
+                    EventTeam.event_key.in_(event_keys)  # pyright: ignore[reportAttributeAccessIssue]
+                )
+            ).all()
+
+            result: dict[str, set[str]] = {}
+            for event_key, team_key in event_teams:
+                if event_key not in result:
+                    result[event_key] = set()
+                result[event_key].add(team_key)
+
+            logger.info(
+                f"Retrieved team keys for {len(result)} events "
+                f"({sum(len(teams) for teams in result.values())} total relationships)"
+            )
+            return result
 
     def _is_event_active(self, event: Event) -> bool:
         buffer = timedelta(days=1, hours=2)

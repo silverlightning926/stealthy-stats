@@ -21,11 +21,13 @@ def sync_rankings(sync_type: SyncType = SyncType.FULL):
 
     event_keys = db.get_event_keys(sync_type=sync_type)
     etags = db.get_etags(_TBAEndpoint.RANKINGS)
-    valid_team_keys = db.get_team_keys()
+    event_team_keys = db.get_event_team_keys(event_keys)
 
     logger.info(f"Syncing rankings for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
+        valid_team_keys = event_team_keys.get(event_key, set())
+
         logger.debug(f"[{idx}/{len(event_keys)}] Processing {event_key}")
 
         etag_key = _TBAEndpoint.RANKINGS.build(event_key=event_key)

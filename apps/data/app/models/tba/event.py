@@ -6,8 +6,74 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance, AllianceTeam
-    from .match import Match
+    from .match import Match, MatchAllianceTeam
     from .ranking import Ranking, RankingEventInfo
+    from .team import Team
+
+
+class EventTeam(SQLModel, table=True):
+    __tablename__ = "event_teams"  # pyright: ignore[reportAssignmentType]
+
+    event_key: str = Field(
+        primary_key=True,
+        foreign_key="events.key",
+        index=True,
+        description="TBA event key.",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+    team_key: str = Field(
+        primary_key=True,
+        foreign_key="teams.key",
+        index=True,
+        description="TBA team key (e.g., 'frc254').",
+        regex=r"^frc\d+$",
+    )
+
+    created_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was created",
+    )
+
+    updated_at: datetime = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+        description="Timestamp when record was last updated",
+    )
+
+    event: "Event" = Relationship(
+        back_populates="event_teams",
+        sa_relationship_kwargs={
+            "overlaps": "match_participations,alliance_participations,ranking"
+        },
+    )
+    team: "Team" = Relationship(
+        back_populates="event_participations",
+        sa_relationship_kwargs={
+            "overlaps": "match_participations,alliance_participations,ranking"
+        },
+    )
+    match_participations: list["MatchAllianceTeam"] = Relationship(
+        back_populates="event_team",
+        sa_relationship_kwargs={"overlaps": "event,team"},
+    )
+    alliance_participations: list["AllianceTeam"] = Relationship(
+        back_populates="event_team",
+        sa_relationship_kwargs={"overlaps": "event,team"},
+    )
+    ranking: "Ranking" = Relationship(
+        back_populates="event_team",
+        sa_relationship_kwargs={"overlaps": "event,team"},
+    )
 
 
 class EventDistrict(SQLModel, table=True):
@@ -233,11 +299,22 @@ class Event(SQLModel, table=True):
             "foreign_keys": "[Event.parent_event_key]",
         },
     )
+    event_teams: list["EventTeam"] = Relationship(
+        back_populates="event",
+        sa_relationship_kwargs={
+            "overlaps": "match_participations,alliance_participations,ranking"
+        },
+    )
     matches: list["Match"] = Relationship(
         back_populates="event",
     )
+    match_alliance_teams: list["MatchAllianceTeam"] = Relationship(
+        back_populates="event",
+        sa_relationship_kwargs={"overlaps": "match,event_teams"},
+    )
     rankings: list["Ranking"] = Relationship(
         back_populates="event",
+        sa_relationship_kwargs={"overlaps": "event_teams"},
     )
     ranking_info: "RankingEventInfo" = Relationship(
         back_populates="event",
@@ -247,5 +324,5 @@ class Event(SQLModel, table=True):
     )
     alliance_teams: list["AllianceTeam"] = Relationship(
         back_populates="event",
-        sa_relationship_kwargs={"overlaps": "alliance,teams"},
+        sa_relationship_kwargs={"overlaps": "alliance,teams,event_teams"},
     )

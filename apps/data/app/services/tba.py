@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 class _TBAEndpoint(StrEnum):
     TEAMS = "/teams/{page}"
     EVENTS = "/events/{year}"
+    EVENT_TEAMS = "/event/{event_key}/teams/keys"
     DISTRICTS = "/districts/{year}"
     MATCHES = "/event/{event_key}/matches"
     RANKINGS = "/event/{event_key}/rankings"
@@ -258,6 +259,38 @@ class TBAService:
         )
 
         return (events_df, event_districts_df, etag)
+
+    def get_event_teams(
+        self, event_key: str, etag: str | None = None
+    ) -> tuple[pl.DataFrame, str | None] | None:
+        response = self._get(
+            endpoint=_TBAEndpoint.EVENT_TEAMS.build(event_key=event_key),
+            etag=etag,
+        )
+
+        if response is None:
+            return None
+
+        data, etag = response
+
+        event_teams_df = (
+            pl.DataFrame({"team_key": data})
+            .filter(pl.col("team_key").is_not_null())
+            .filter(
+                ~pl.col("team_key")
+                .str.extract(r"^frc(\d+)$", 1)
+                .cast(pl.Int32)
+                .is_between(9970, 9999)
+            )
+            .with_columns(pl.lit(event_key).alias("event_key"))
+            .select("event_key", "team_key")
+        )
+
+        logger.debug(
+            f"Processed {len(event_teams_df)} event teams for event {event_key}"
+        )
+
+        return (event_teams_df, etag)
 
     def get_matches(
         self, event_key: str, etag: str | None = None

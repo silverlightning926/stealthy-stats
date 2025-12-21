@@ -10,28 +10,26 @@ from app.types import SyncType
 
 
 @task(
-    name="Sync Alliances",
-    description="Sync FRC alliances and alliance teams from The Blue Alliance",
+    name="Sync Event Teams",
+    description="Sync FRC event team participation from The Blue Alliance",
     retries=2,
     retry_delay_seconds=10,
 )
-def sync_alliances(sync_type: SyncType = SyncType.FULL):
+def sync_event_teams(sync_type: SyncType = SyncType.FULL):
     logger = get_run_logger()
-    logger.info(f"Starting alliance sync with sync_type={sync_type.value}")
+    logger.info(f"Starting event teams sync with sync_type={sync_type.value}")
 
     event_keys = db.get_event_keys(sync_type=sync_type)
-    etags = db.get_etags(_TBAEndpoint.ALLIANCES)
-    event_team_keys = db.get_event_team_keys(event_keys)
+    etags = db.get_etags(_TBAEndpoint.EVENT_TEAMS)
+    valid_team_keys = db.get_team_keys()
 
-    logger.info(f"Syncing alliances for {len(event_keys)} events")
+    logger.info(f"Syncing event teams for {len(event_keys)} events")
 
     for idx, event_key in enumerate(event_keys, start=1):
-        valid_team_keys = event_team_keys.get(event_key, set())
-
         logger.debug(f"[{idx}/{len(event_keys)}] Processing {event_key}")
 
-        etag_key = _TBAEndpoint.ALLIANCES.build(event_key=event_key)
-        result = tba.get_alliances(
+        etag_key = _TBAEndpoint.EVENT_TEAMS.build(event_key=event_key)
+        result = tba.get_event_teams(
             event_key=event_key,
             etag=etags.get(etag_key),
         )
@@ -43,23 +41,20 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
             sleep(0.5)
             continue
 
-        alliances_df, alliance_teams_df, etag = result
+        event_teams_df, etag = result
 
-        alliance_teams_df = alliance_teams_df.filter(
+        event_teams_df = event_teams_df.filter(
             pl.col("team_key").is_in(valid_team_keys)
         )
 
         upserts = []
 
-        if not alliances_df.is_empty():
-            upserts.append((alliances_df, "alliances", ["event_key", "name"]))
-
-        if not alliance_teams_df.is_empty():
+        if not event_teams_df.is_empty():
             upserts.append(
                 (
-                    alliance_teams_df,
-                    "alliance_teams",
-                    ["event_key", "alliance_name", "team_key"],
+                    event_teams_df,
+                    "event_teams",
+                    ["event_key", "team_key"],
                 )
             )
 
@@ -69,11 +64,10 @@ def sync_alliances(sync_type: SyncType = SyncType.FULL):
 
         if upserts:
             logger.info(
-                f"[{idx}/{len(event_keys)}] {event_key}: "
-                f"{len(alliances_df)} alliances, {len(alliance_teams_df)} teams"
+                f"[{idx}/{len(event_keys)}] {event_key}: {len(event_teams_df)} teams"
             )
             db.upsert_many(upserts)
 
         sleep(0.5)
 
-    logger.info("Alliance sync completed successfully")
+    logger.info("Event teams sync completed successfully")

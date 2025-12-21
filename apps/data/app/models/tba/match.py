@@ -5,7 +5,7 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKeyConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .event import Event
+    from .event import Event, EventTeam
     from .team import Team
 
 
@@ -17,11 +17,14 @@ class MatchAllianceTeam(SQLModel, table=True):
             ["match_key", "alliance_color"],
             ["match_alliances.match_key", "match_alliances.alliance_color"],
         ),
+        ForeignKeyConstraint(
+            ["event_key", "team_key"],
+            ["event_teams.event_key", "event_teams.team_key"],
+        ),
     )
 
     match_key: str = Field(
         primary_key=True,
-        foreign_key="matches.key",
         index=True,
         description="TBA match key.",
         regex=r"^\d{4}[a-z0-9]+_(qm|ef|qf|sf|f)\d*m\d+$",
@@ -33,10 +36,16 @@ class MatchAllianceTeam(SQLModel, table=True):
     )
     team_key: str = Field(
         primary_key=True,
-        foreign_key="teams.key",
         index=True,
         description="TBA team key (e.g., 'frc254').",
         regex=r"^frc\d+$",
+    )
+
+    event_key: str = Field(
+        foreign_key="events.key",
+        index=True,
+        description="TBA event key (derived from match).",
+        regex=r"^\d{4}[a-z0-9]+$",
     )
 
     is_surrogate: bool = Field(
@@ -71,6 +80,7 @@ class MatchAllianceTeam(SQLModel, table=True):
 
     match: "Match" = Relationship(
         back_populates="alliance_teams",
+        sa_relationship_kwargs={"overlaps": "event,event_team"},
     )
     alliance: "MatchAlliance" = Relationship(
         back_populates="teams",
@@ -78,8 +88,17 @@ class MatchAllianceTeam(SQLModel, table=True):
             "viewonly": True,
         },
     )
+    event: "Event" = Relationship(
+        back_populates="match_alliance_teams",
+        sa_relationship_kwargs={"overlaps": "match,event_team"},
+    )
+    event_team: "EventTeam" = Relationship(
+        back_populates="match_participations",
+        sa_relationship_kwargs={"overlaps": "event,team"},
+    )
     team: "Team" = Relationship(
         back_populates="match_participations",
+        sa_relationship_kwargs={"overlaps": "event_team"},
     )
 
 
@@ -230,5 +249,6 @@ class Match(SQLModel, table=True):
         sa_relationship_kwargs={
             "viewonly": True,
             "primaryjoin": "Match.key == MatchAllianceTeam.match_key",
+            "overlaps": "event",
         },
     )

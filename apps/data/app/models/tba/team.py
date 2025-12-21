@@ -6,6 +6,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .alliance import Alliance, AllianceTeam
+    from .event import EventTeam
     from .match import MatchAllianceTeam
     from .ranking import Ranking
 
@@ -83,14 +84,23 @@ class Team(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
+    event_participations: list["EventTeam"] = Relationship(
+        back_populates="team",
+        sa_relationship_kwargs={
+            "overlaps": "match_participations,alliance_participations,ranking"
+        },
+    )
     alliance_participations: list["AllianceTeam"] = Relationship(
         back_populates="team",
+        sa_relationship_kwargs={"overlaps": "event_participations"},
     )
     match_participations: list["MatchAllianceTeam"] = Relationship(
         back_populates="team",
+        sa_relationship_kwargs={"overlaps": "event_participations"},
     )
     rankings: list["Ranking"] = Relationship(
         back_populates="team",
+        sa_relationship_kwargs={"overlaps": "event_participations"},
     )
     alliances_backup_in: list["Alliance"] = Relationship(
         back_populates="team_backup_in",
