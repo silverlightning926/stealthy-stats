@@ -421,6 +421,7 @@ class TBAService:
                 [
                     "match_key",
                     "alliance_color",
+                    "event_key",
                     "team_keys",
                     "surrogate_team_keys",
                     "dq_team_keys",
@@ -448,6 +449,7 @@ class TBAService:
                     "match_key",
                     "alliance_color",
                     "team_key",
+                    "event_key",
                     "is_surrogate",
                     "is_dq",
                 ]
@@ -463,7 +465,7 @@ class TBAService:
             ]
         )
 
-        matches_df = matches_df.drop("alliances", "score_breakdown").select(
+        matches_df = matches_df.select(
             "key",
             "event_key",
             "comp_level",
