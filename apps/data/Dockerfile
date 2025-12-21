@@ -35,6 +35,7 @@ USER prefect
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/apps/data
 
 CMD ["python", "apps/data/main.py"]
 
@@ -52,6 +53,7 @@ RUN useradd -m -u 1000 prefect && \
 USER prefect
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app/apps/data
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request as u; u.urlopen('http://prefect-server:4200/api/health', timeout=5)" || exit 1
