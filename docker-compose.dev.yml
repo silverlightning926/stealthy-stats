@@ -78,8 +78,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./apps/data/app:/app/apps/data/app:ro
-      - ./packages:/app/packages:ro
+      - ./apps/data:/app/apps/data:ro
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_EXTRA_LOGGERS: app.services.*

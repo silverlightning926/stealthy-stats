@@ -11,7 +11,6 @@ COPY apps/data/pyproject.toml apps/data/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-COPY packages/ ./packages/
 COPY apps/data/ ./apps/data/
 
 FROM python:3.14-slim-trixie AS development
@@ -25,7 +24,6 @@ COPY apps/data/pyproject.toml apps/data/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
-COPY packages/ ./packages/
 COPY apps/data/ ./apps/data/
 
 RUN useradd -m -u 1000 prefect && \
@@ -44,7 +42,6 @@ FROM python:3.14-slim-trixie AS production
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/packages /app/packages
 COPY --from=builder /app/apps/data /app/apps/data
 
 RUN useradd -m -u 1000 prefect && \

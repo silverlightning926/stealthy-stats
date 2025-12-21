@@ -93,8 +93,7 @@ services:
       - data-network
     restart: unless-stopped
     volumes:
-      - ../../apps/data/app:/app/apps/data/app:ro
-      - ../../packages:/app/packages:ro
+      - ../../apps/data:/app/apps/data:ro
 
 volumes:
   prefect-db:

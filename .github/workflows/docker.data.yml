@@ -8,7 +8,6 @@ on:
       - "data/v*.*.*"
     paths:
       - "apps/data/**"
-      - "packages/**"
       - "pyproject.toml"
       - "uv.lock"
       - "apps/data/Dockerfile"
