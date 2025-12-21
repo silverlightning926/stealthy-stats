@@ -178,6 +178,14 @@ class DBService:
 
             return etags
 
+    def get_team_keys(self) -> set[str]:
+        logger.debug("Fetching team keys from database")
+        with self.get_session() as session:
+            teams = session.exec(select(Team.key)).all()
+            team_keys = set(teams)
+            logger.info(f"Retrieved {len(team_keys)} team keys")
+            return team_keys
+
     def get_event_team_keys(self, event_keys: list[str]) -> dict[str, set[str]]:
         logger.debug(f"Fetching team keys for {len(event_keys)} events from database")
 
