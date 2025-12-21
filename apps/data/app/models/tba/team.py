@@ -84,35 +84,38 @@ class Team(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event_participations: list["EventTeam"] = Relationship(
+    event_participations: list["EventTeam"] = Relationship(back_populates="team")
+
+    match_participations: list["MatchAllianceTeam"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={
-            "overlaps": "match_participations,alliance_participations,ranking"
+            "viewonly": True,
+            "primaryjoin": "Team.key == MatchAllianceTeam.team_key",
+            "foreign_keys": "[MatchAllianceTeam.team_key]",
         },
     )
     alliance_participations: list["AllianceTeam"] = Relationship(
         back_populates="team",
-        sa_relationship_kwargs={"overlaps": "event_participations"},
-    )
-    match_participations: list["MatchAllianceTeam"] = Relationship(
-        back_populates="team",
-        sa_relationship_kwargs={"overlaps": "event_participations"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Team.key == AllianceTeam.team_key",
+            "foreign_keys": "[AllianceTeam.team_key]",
+        },
     )
     rankings: list["Ranking"] = Relationship(
         back_populates="team",
-        sa_relationship_kwargs={"overlaps": "event_participations"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Team.key == Ranking.team_key",
+            "foreign_keys": "[Ranking.team_key]",
+        },
     )
+
     alliances_backup_in: list["Alliance"] = Relationship(
         back_populates="team_backup_in",
-        sa_relationship_kwargs={
-            "primaryjoin": "Team.key == Alliance.backup_in",
-            "foreign_keys": "[Alliance.backup_in]",
-        },
+        sa_relationship_kwargs={"foreign_keys": "[Alliance.backup_in]"},
     )
     alliances_backup_out: list["Alliance"] = Relationship(
         back_populates="team_backup_out",
-        sa_relationship_kwargs={
-            "primaryjoin": "Team.key == Alliance.backup_out",
-            "foreign_keys": "[Alliance.backup_out]",
-        },
+        sa_relationship_kwargs={"foreign_keys": "[Alliance.backup_out]"},
     )

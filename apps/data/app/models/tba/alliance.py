@@ -25,7 +25,6 @@ class AllianceTeam(SQLModel, table=True):
 
     event_key: str = Field(
         primary_key=True,
-        foreign_key="events.key",
         index=True,
         description="TBA event key.",
         regex=r"^\d{4}[a-z0-9]+$",
@@ -67,21 +66,27 @@ class AllianceTeam(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    alliance: "Alliance" = Relationship(
-        back_populates="teams",
-        sa_relationship_kwargs={"overlaps": "event,event_team"},
-    )
-    event: "Event" = Relationship(
-        back_populates="alliance_teams",
-        sa_relationship_kwargs={"overlaps": "alliance,event_team"},
-    )
+    alliance: "Alliance" = Relationship(back_populates="teams")
     event_team: "EventTeam" = Relationship(
         back_populates="alliance_participations",
-        sa_relationship_kwargs={"overlaps": "event,team"},
+        sa_relationship_kwargs={"overlaps": "alliance,teams"},
+    )
+
+    event: "Event" = Relationship(
+        back_populates="alliance_teams",
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "AllianceTeam.event_key == Event.key",
+            "foreign_keys": "[AllianceTeam.event_key]",
+        },
     )
     team: "Team" = Relationship(
         back_populates="alliance_participations",
-        sa_relationship_kwargs={"overlaps": "event_team"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "AllianceTeam.team_key == Team.key",
+            "foreign_keys": "[AllianceTeam.team_key]",
+        },
     )
 
 
@@ -209,24 +214,17 @@ class Alliance(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event: "Event" = Relationship(
-        back_populates="alliances",
-    )
+    event: "Event" = Relationship(back_populates="alliances")
     teams: list["AllianceTeam"] = Relationship(
         back_populates="alliance",
-        sa_relationship_kwargs={"overlaps": "event,event_team"},
+        sa_relationship_kwargs={"overlaps": "event_team,alliance_participations"},
     )
+
     team_backup_in: "Team" = Relationship(
         back_populates="alliances_backup_in",
-        sa_relationship_kwargs={
-            "primaryjoin": "Alliance.backup_in == Team.key",
-            "foreign_keys": "[Alliance.backup_in]",
-        },
+        sa_relationship_kwargs={"foreign_keys": "[Alliance.backup_in]"},
     )
     team_backup_out: "Team" = Relationship(
         back_populates="alliances_backup_out",
-        sa_relationship_kwargs={
-            "primaryjoin": "Alliance.backup_out == Team.key",
-            "foreign_keys": "[Alliance.backup_out]",
-        },
+        sa_relationship_kwargs={"foreign_keys": "[Alliance.backup_out]"},
     )

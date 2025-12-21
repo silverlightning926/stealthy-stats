@@ -42,7 +42,6 @@ class MatchAllianceTeam(SQLModel, table=True):
     )
 
     event_key: str = Field(
-        foreign_key="events.key",
         index=True,
         description="TBA event key (derived from match).",
         regex=r"^\d{4}[a-z0-9]+$",
@@ -78,27 +77,37 @@ class MatchAllianceTeam(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    match: "Match" = Relationship(
-        back_populates="alliance_teams",
-        sa_relationship_kwargs={"overlaps": "event,event_team"},
+    alliance: "MatchAlliance" = Relationship(back_populates="teams")
+
+    event_team: "EventTeam" = Relationship(
+        back_populates="match_participations",
+        sa_relationship_kwargs={"overlaps": "alliance,teams"},
     )
-    alliance: "MatchAlliance" = Relationship(
-        back_populates="teams",
+
+    match: "Match" = Relationship(
         sa_relationship_kwargs={
             "viewonly": True,
+            "primaryjoin": "MatchAllianceTeam.match_key == Match.key",
+            "foreign_keys": "[MatchAllianceTeam.match_key]",
         },
     )
     event: "Event" = Relationship(
         back_populates="match_alliance_teams",
-        sa_relationship_kwargs={"overlaps": "match,event_team"},
-    )
-    event_team: "EventTeam" = Relationship(
-        back_populates="match_participations",
-        sa_relationship_kwargs={"overlaps": "event,team"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "MatchAllianceTeam.event_key == Event.key",
+            "foreign_keys": "[MatchAllianceTeam.event_key]",
+            "overlaps": "event_team,match_participations",
+        },
     )
     team: "Team" = Relationship(
         back_populates="match_participations",
-        sa_relationship_kwargs={"overlaps": "event_team"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "MatchAllianceTeam.team_key == Team.key",
+            "foreign_keys": "[MatchAllianceTeam.team_key]",
+            "overlaps": "event_team,match_participations",
+        },
     )
 
 
@@ -149,14 +158,10 @@ class MatchAlliance(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    match: "Match" = Relationship(
-        back_populates="alliances",
-    )
+    match: "Match" = Relationship(back_populates="alliances")
     teams: list["MatchAllianceTeam"] = Relationship(
         back_populates="alliance",
-        sa_relationship_kwargs={
-            "viewonly": True,
-        },
+        sa_relationship_kwargs={"overlaps": "event_team,match_participations"},
     )
 
 
@@ -238,17 +243,5 @@ class Match(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event: "Event" = Relationship(
-        back_populates="matches",
-    )
-    alliances: list["MatchAlliance"] = Relationship(
-        back_populates="match",
-    )
-    alliance_teams: list["MatchAllianceTeam"] = Relationship(
-        back_populates="match",
-        sa_relationship_kwargs={
-            "viewonly": True,
-            "primaryjoin": "Match.key == MatchAllianceTeam.match_key",
-            "overlaps": "event",
-        },
-    )
+    event: "Event" = Relationship(back_populates="matches")
+    alliances: list["MatchAlliance"] = Relationship(back_populates="match")

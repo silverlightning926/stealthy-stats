@@ -50,25 +50,16 @@ class EventTeam(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event: "Event" = Relationship(
-        back_populates="event_teams",
-        sa_relationship_kwargs={
-            "overlaps": "match_participations,alliance_participations,ranking"
-        },
-    )
-    team: "Team" = Relationship(
-        back_populates="event_participations",
-        sa_relationship_kwargs={
-            "overlaps": "match_participations,alliance_participations,ranking"
-        },
-    )
+    event: "Event" = Relationship(back_populates="event_teams")
+    team: "Team" = Relationship(back_populates="event_participations")
+
     match_participations: list["MatchAllianceTeam"] = Relationship(
         back_populates="event_team",
-        sa_relationship_kwargs={"overlaps": "event,team"},
+        sa_relationship_kwargs={"overlaps": "alliance,teams"},
     )
     alliance_participations: list["AllianceTeam"] = Relationship(
         back_populates="event_team",
-        sa_relationship_kwargs={"overlaps": "event,team"},
+        sa_relationship_kwargs={"overlaps": "alliance,teams"},
     )
     ranking: "Ranking" = Relationship(
         back_populates="event_team",
@@ -118,9 +109,7 @@ class EventDistrict(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    events: list["Event"] = Relationship(
-        back_populates="district",
-    )
+    events: list["Event"] = Relationship(back_populates="district")
 
 
 class Event(SQLModel, table=True):
@@ -283,9 +272,8 @@ class Event(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    district: "EventDistrict" = Relationship(
-        back_populates="events",
-    )
+    district: "EventDistrict" = Relationship(back_populates="events")
+
     parent_event: "Event" = Relationship(
         back_populates="division_events",
         sa_relationship_kwargs={
@@ -295,34 +283,36 @@ class Event(SQLModel, table=True):
     )
     division_events: list["Event"] = Relationship(
         back_populates="parent_event",
-        sa_relationship_kwargs={
-            "foreign_keys": "[Event.parent_event_key]",
-        },
+        sa_relationship_kwargs={"foreign_keys": "[Event.parent_event_key]"},
     )
-    event_teams: list["EventTeam"] = Relationship(
-        back_populates="event",
-        sa_relationship_kwargs={
-            "overlaps": "match_participations,alliance_participations,ranking"
-        },
-    )
-    matches: list["Match"] = Relationship(
-        back_populates="event",
-    )
+
+    event_teams: list["EventTeam"] = Relationship(back_populates="event")
+
+    matches: list["Match"] = Relationship(back_populates="event")
+    alliances: list["Alliance"] = Relationship(back_populates="event")
+    ranking_info: "RankingEventInfo" = Relationship(back_populates="event")
+
     match_alliance_teams: list["MatchAllianceTeam"] = Relationship(
         back_populates="event",
-        sa_relationship_kwargs={"overlaps": "match,event_teams"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Event.key == MatchAllianceTeam.event_key",
+            "foreign_keys": "[MatchAllianceTeam.event_key]",
+        },
     )
     rankings: list["Ranking"] = Relationship(
         back_populates="event",
-        sa_relationship_kwargs={"overlaps": "event_teams"},
-    )
-    ranking_info: "RankingEventInfo" = Relationship(
-        back_populates="event",
-    )
-    alliances: list["Alliance"] = Relationship(
-        back_populates="event",
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Event.key == Ranking.event_key",
+            "foreign_keys": "[Ranking.event_key]",
+        },
     )
     alliance_teams: list["AllianceTeam"] = Relationship(
         back_populates="event",
-        sa_relationship_kwargs={"overlaps": "alliance,teams,event_teams"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Event.key == AllianceTeam.event_key",
+            "foreign_keys": "[AllianceTeam.event_key]",
+        },
     )

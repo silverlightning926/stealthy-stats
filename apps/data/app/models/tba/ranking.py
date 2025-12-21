@@ -61,9 +61,7 @@ class RankingEventInfo(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
-    event: "Event" = Relationship(
-        back_populates="ranking_info",
-    )
+    event: "Event" = Relationship(back_populates="ranking_info")
 
 
 class Ranking(SQLModel, table=True):
@@ -155,15 +153,21 @@ class Ranking(SQLModel, table=True):
         description="Timestamp when record was last updated",
     )
 
+    event_team: "EventTeam" = Relationship(back_populates="ranking")
+
     event: "Event" = Relationship(
         back_populates="rankings",
-        sa_relationship_kwargs={"overlaps": "event_team"},
-    )
-    event_team: "EventTeam" = Relationship(
-        back_populates="ranking",
-        sa_relationship_kwargs={"overlaps": "event,team"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Ranking.event_key == Event.key",
+            "foreign_keys": "[Ranking.event_key]",
+        },
     )
     team: "Team" = Relationship(
         back_populates="rankings",
-        sa_relationship_kwargs={"overlaps": "event_team"},
+        sa_relationship_kwargs={
+            "viewonly": True,
+            "primaryjoin": "Ranking.team_key == Team.key",
+            "foreign_keys": "[Ranking.team_key]",
+        },
     )
