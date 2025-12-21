@@ -17,9 +17,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "pyright>=1.1.407",
   "ruff>=0.14.8",
   "taskipy>=1.14.1",
+  "ty>=0.0.5",
 ]
 
 [tool.taskipy.tasks]
@@ -38,7 +38,7 @@ lint = "ruff check ."
 server = "prefect server start"
 start = "python main.py"
 # Type checking
-type = "pyright ."
+type = "ty check ."
 
 [tool.uv]
 package = false

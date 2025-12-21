@@ -54,7 +54,7 @@ class _DBConfig(BaseSettings):
 class DBService:
     def __init__(self):
         logger.info("Initializing database service")
-        self.config = _DBConfig()  # pyright: ignore[reportCallIssue]
+        self.config = _DBConfig()
 
         self.engine = create_engine(
             self.config.db_url.get_secret_value(),
@@ -168,9 +168,7 @@ class DBService:
 
         with self.get_session() as session:
             results = session.exec(
-                select(ETag.endpoint, ETag.etag).where(
-                    ETag.endpoint.like(pattern)  # pyright: ignore[reportAttributeAccessIssue]
-                )
+                select(ETag.endpoint, ETag.etag).where(ETag.endpoint.like(pattern))  # ty:ignore[unresolved-attribute]
             ).all()
 
             etags = {endpoint: etag for endpoint, etag in results}
@@ -192,7 +190,7 @@ class DBService:
         with self.get_session() as session:
             event_teams = session.exec(
                 select(EventTeam.event_key, EventTeam.team_key).where(
-                    EventTeam.event_key.in_(event_keys)  # pyright: ignore[reportAttributeAccessIssue]
+                    EventTeam.event_key.in_(event_keys)  # ty:ignore[unresolved-attribute]
                 )
             ).all()
 
@@ -225,7 +223,7 @@ class DBService:
             if sync_type == SyncType.FULL:
                 # All inactive events, all years
                 events = list(
-                    session.exec(select(Event).order_by(Event.start_date)).all()  # pyright: ignore[reportArgumentType]
+                    session.exec(select(Event).order_by(Event.start_date)).all()  # ty:ignore[invalid-argument-type]
                 )
                 keys = [
                     event.key for event in events if not self._is_event_active(event)
@@ -237,7 +235,7 @@ class DBService:
                     session.exec(
                         select(Event)
                         .where(Event.year == datetime.now().year)
-                        .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                        .order_by(Event.start_date)  # ty:ignore[invalid-argument-type]
                     ).all()
                 )
                 keys = [event.key for event in events if self._is_event_active(event)]
@@ -248,7 +246,7 @@ class DBService:
                     session.exec(
                         select(Event)
                         .where(Event.year == datetime.now().year)
-                        .order_by(Event.start_date)  # pyright: ignore[reportArgumentType]
+                        .order_by(Event.start_date)  # ty:ignore[invalid-argument-type]
                     ).all()
                 )
                 keys = [

@@ -57,7 +57,7 @@ class _TBAConfig(BaseSettings):
 class TBAService:
     def __init__(self):
         logger.info("Initializing TBA service")
-        self.config = _TBAConfig()  # pyright: ignore[reportCallIssue]
+        self.config = _TBAConfig()
         logger.info(f"TBA service initialized with base URL: {self.config.base_url}")
 
     @retry(

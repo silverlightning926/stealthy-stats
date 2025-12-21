@@ -20,7 +20,7 @@ class RankingSortOrderInfo(SQLModel):
 
 
 class RankingEventInfo(SQLModel, table=True):
-    __tablename__ = "ranking_event_infos"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "ranking_event_infos"
 
     event_key: str = Field(
         primary_key=True,
@@ -65,7 +65,7 @@ class RankingEventInfo(SQLModel, table=True):
 
 
 class Ranking(SQLModel, table=True):
-    __tablename__ = "rankings"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "rankings"
 
     __table_args__ = (
         ForeignKeyConstraint(

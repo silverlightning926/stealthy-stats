@@ -5,7 +5,7 @@ from sqlmodel import Field, SQLModel
 
 
 class ETag(SQLModel, table=True):
-    __tablename__ = "etags"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "etags"
 
     endpoint: str = Field(
         primary_key=True,

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class AllianceTeam(SQLModel, table=True):
-    __tablename__ = "alliance_teams"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "alliance_teams"
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -91,7 +91,7 @@ class AllianceTeam(SQLModel, table=True):
 
 
 class Alliance(SQLModel, table=True):
-    __tablename__ = "alliances"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "alliances"
 
     event_key: str = Field(
         primary_key=True,

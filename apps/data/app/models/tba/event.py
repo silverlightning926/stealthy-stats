@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class EventTeam(SQLModel, table=True):
-    __tablename__ = "event_teams"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "event_teams"
 
     event_key: str = Field(
         primary_key=True,
@@ -68,7 +68,7 @@ class EventTeam(SQLModel, table=True):
 
 
 class EventDistrict(SQLModel, table=True):
-    __tablename__ = "event_districts"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "event_districts"
 
     key: str = Field(
         primary_key=True,
@@ -113,7 +113,7 @@ class EventDistrict(SQLModel, table=True):
 
 
 class Event(SQLModel, table=True):
-    __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "events"
 
     key: str = Field(
         primary_key=True,

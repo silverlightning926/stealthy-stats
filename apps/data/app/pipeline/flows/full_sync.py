@@ -26,18 +26,18 @@ def full_sync():
     sync_teams()
 
     logger.info("Step 2/6: Syncing events")
-    sync_events(sync_type=SyncType.FULL)
+    sync_events(sync_type=SyncType.FULL)  # ty:ignore[no-matching-overload]
 
     logger.info("Step 3/6: Syncing event teams")
-    sync_event_teams(sync_type=SyncType.FULL)
+    sync_event_teams(sync_type=SyncType.FULL)  # ty:ignore[no-matching-overload]
 
     logger.info("Step 4/6: Syncing matches")
-    sync_matches(sync_type=SyncType.FULL)
+    sync_matches(sync_type=SyncType.FULL)  # ty:ignore[no-matching-overload]
 
     logger.info("Step 5/6: Syncing rankings")
-    sync_rankings(sync_type=SyncType.FULL)
+    sync_rankings(sync_type=SyncType.FULL)  # ty:ignore[no-matching-overload]
 
     logger.info("Step 6/6: Syncing alliances")
-    sync_alliances(sync_type=SyncType.FULL)
+    sync_alliances(sync_type=SyncType.FULL)  # ty:ignore[no-matching-overload]
 
     logger.info("Full sync flow completed successfully")

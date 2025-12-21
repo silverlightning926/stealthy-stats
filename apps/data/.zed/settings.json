@@ -1,29 +1,23 @@
 {
   "languages": {
     "Python": {
-      "language_servers": ["ruff", "pyright"],
+      "language_servers": ["ruff", "ty"],
       "format_on_save": "on",
-      "formatter": "language_server"
-    }
+      "formatter": "language_server",
+    },
   },
   "lsp": {
     "ruff": {
       "binary": {
         "path": "uv",
-        "arguments": ["run", "--project", "apps/data", "ruff", "server"]
-      }
+        "arguments": ["run", "--project", "apps/data", "ruff", "server"],
+      },
     },
-    "pyright": {
+    "ty": {
       "binary": {
         "path": "uv",
-        "arguments": [
-          "run",
-          "--project",
-          "apps/data",
-          "pyright-langserver",
-          "--stdio"
-        ]
-      }
-    }
-  }
+        "arguments": ["run", "--project", "apps/data", "ty", "server"],
+      },
+    },
+  },
 }

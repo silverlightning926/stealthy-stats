@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class Team(SQLModel, table=True):
-    __tablename__ = "teams"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "teams"
 
     key: str = Field(
         primary_key=True,
