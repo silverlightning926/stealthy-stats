@@ -219,6 +219,9 @@ class TBAService:
                 pl.col("end_date").str.to_date(),
             )
             .drop("district")
+            .with_columns(
+                pl.coalesce("parent_event_key", "key").alias("group_key"),
+            )
             .select(
                 "key",
                 "district_key",
@@ -249,6 +252,7 @@ class TBAService:
                 "playoff_type",
                 "playoff_type_string",
                 "division_keys",
+                "group_key",
             )
         )
 

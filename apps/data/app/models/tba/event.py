@@ -251,6 +251,12 @@ class Event(SQLModel, table=True):
         description="Division event keys (for championship events).",
     )
 
+    group_key: str = Field(
+        index=True,
+        description="Root event key for grouping (self for standalone/parent, parent_key for divisions).",
+        regex=r"^\d{4}[a-z0-9]+$",
+    )
+
     created_at: datetime = Field(
         default=None,
         sa_column=Column(
