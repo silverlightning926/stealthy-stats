@@ -1,11 +1,23 @@
-from datetime import timedelta
-
 from prefect import serve
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import func, select
 
 from app.models.tba import Alliance, Event, Match, Ranking, Team
 from app.pipeline.flows import full_sync, live_sync, year_sync
 from app.services import DBService
+
+
+class _ScheduleConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    full_sync_cron: str = Field("0 0 1 * *", validation_alias="FULL_SYNC_CRON")
+    year_sync_cron: str = Field("0 0 * * 3", validation_alias="YEAR_SYNC_CRON")
+    live_sync_cron: str = Field("*/5 * * * *", validation_alias="LIVE_SYNC_CRON")
 
 
 def main():
@@ -32,19 +44,21 @@ def main():
     except Exception:
         full_sync()
 
+    schedule = _ScheduleConfig()
+
     full_sync_deployment = full_sync.to_deployment(
         name="full-sync-deployment",
-        cron="0 0 1 * *",  # Midnight on the 1st of the month
+        cron=schedule.full_sync_cron,
     )
 
     year_sync_deployment = year_sync.to_deployment(
         name="year-sync-deployment",
-        cron="0 0 * * 3",  # Midnight on Wednesdays
+        cron=schedule.year_sync_cron,
     )
 
     live_sync_deployment = live_sync.to_deployment(
         name="live-sync-deployment",
-        interval=timedelta(minutes=7),
+        cron=schedule.live_sync_cron,
     )
 
     serve(full_sync_deployment, year_sync_deployment, live_sync_deployment)  # type: ignore
