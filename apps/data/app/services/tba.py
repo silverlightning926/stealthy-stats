@@ -274,7 +274,7 @@ class TBAService:
         data, etag = response
 
         event_teams_df = (
-            pl.DataFrame({"team_key": data})
+            pl.DataFrame({"team_key": data}, schema={"team_key": pl.String})
             .filter(pl.col("team_key").is_not_null())
             .filter(
                 ~pl.col("team_key")
@@ -502,9 +502,12 @@ class TBAService:
 
         data, etag = response
 
+        if not data or not isinstance(data, dict):
+            return None
+
         rankings_df = (
             pl.from_dicts(
-                data.get("rankings"),
+                data.get("rankings") or [],
                 schema={
                     "team_key": pl.String,
                     "rank": pl.Int32,
